@@ -56,5 +56,6 @@ jobs:
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
         run: |
           if ([string]::IsNullOrWhiteSpace($env:TEST_USER_EMAIL) -or [string]::IsNullOrWhiteSpace($env:TEST_USER_PASSWORD)) { exit 1 }
+          New-Item -ItemType Directory -Force -Path reports | Out-Null
           bru run --env Staging --bail --reporter-json reports/github-actions.json --reporter-skip-all-headers --reporter-skip-body
         shell: pwsh

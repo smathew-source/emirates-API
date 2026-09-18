@@ -1,0 +1,305 @@
+meta {
+  name: Order Reshop Change Search
+  type: graphql
+  seq: 8
+}
+
+post {
+  url: {{apiBaseUrl}}
+  body: graphql
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Referer: https://workbench.staging.llc.nuflights.com/
+  authorization: {{ndcAuthorization}}
+  x-nf-active-org-short-code: {{activeOrgShortCode}}
+}
+
+body:graphql {
+  query ndcairshoppingReshopQuery($rq: OrderReshopRqInput!) {
+    iataOrderReshop(rq: $rq) {
+      payloadAttributes {
+        trxId
+      }
+      augmentationPoint {
+        common {
+          nfOrderId
+          nfSubscriptionId
+          isLocalInventorySubscription
+          nfSubscriptionAirlineDesigCode
+        }
+        provider {
+          nfShoppingResponseId
+        }
+      }
+      response {
+        reshopResults {
+          repricedOffer {
+            offerRefId
+            ownerCode
+          }
+          reshopOffers {
+            offer {
+              offerId
+              ownerCode
+              offerItem {
+                offerItemId
+                nameChangeService {
+                  paxRefId
+                }
+              }
+              totalPrice {
+                totalAmount {
+                  cdata
+                  curCode
+                }
+              }
+            }
+          }
+        }
+      }
+      error {
+        code
+        descText
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "rq": {
+      "distributionChain": {
+        "distributionChainLink": [
+          {
+            "ordinal": 1,
+            "orgRole": "SELLER",
+            "participatingOrg": {
+              "orgId": "{{servicingOrgId}}"
+            }
+          }
+        ]
+      },
+      "pos": {
+        "country": {
+          "countryCode": "{{servicingCountryCode}}"
+        }
+      },
+      "augmentationPoint": {
+        "common": {
+          "nfSubscriptionId": "{{ticketedNfSubscriptionId}}"
+        }
+      },
+      "payloadAttributes": {
+        "trxId": "{{changeOrderTrxId}}"
+      },
+      "request": {
+        "orderRefId": "{{ticketedOrderId}}",
+        "updateOrder": {
+          "reshopOrder": {
+            "reshopOrderChoice": {
+              "serviceOrder": {
+                "deleteOrderItem": [
+                  {
+                    "orderItemRefId": "{{changeOrderItemId}}",
+                    "retainServiceId": [
+                      " "
+                    ]
+                  }
+                ],
+                "addOfferItems": {
+                  "flightRequest": {
+                    "flightRequestOriginDestinationsCriteria": {
+                      "originDestCriteria": [
+                        {
+                          "originDestId": "OD1",
+                          "originDepCriteria": {
+                            "date": "{{changeDepartureDate}}",
+                            "iataLocationCode": "{{changeOrigin}}"
+                          },
+                          "destArrivalCriteria": {
+                            "iataLocationCode": "{{changeDestination}}"
+                          },
+                          "cabinType": [
+                            {
+                              "cabinTypeCode": "{{changeCabinTypeCode}}",
+                              "prefLevel": {
+                                "prefLevelCode": "PREFERRED"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "orderCriteria": {
+                    "fareCriteria": [
+                      {
+                        "prefLevel": {
+                          "prefLevelCode": "PREFERRED"
+                        },
+                        "fareTypeCode": [
+                          "70J"
+                        ],
+                        "fareSubTypeCode": [
+                          ""
+                        ]
+                      }
+                    ]
+                  },
+                  "paxList": {
+                    "pax": [
+                      {
+                        "ptc": "{{changePassengerType}}",
+                        "paxId": "{{changePassengerId}}"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responseParameters": {
+          "pricingParameter": {
+            "overrideCurCode": "{{changeCurrency}}"
+          }
+        }
+      }
+    }
+  }
+}
+
+script:pre-request {
+  const required = [
+    "ticketedNfSubscriptionId", "ticketedOrderId", "changeOrderTrxId", "changeOrderItemId",
+    "changeDepartureDate", "changeOrigin", "changeDestination", "changePassengerId"
+  ];
+  const missing = required.filter(name => !(bru.getVar(name) || bru.getEnvVar(name)));
+  if (missing.length) {
+    throw new Error("Run a successful ticketed-order retrieval first; missing: " + missing.join(", "));
+  }
+}
+
+script:post-response {
+  const reshop = res.body.data && res.body.data.iataOrderReshop;
+
+  if (reshop) {
+    bru.setVar("reshopTrxId", reshop.payloadAttributes && reshop.payloadAttributes.trxId);
+    bru.setEnvVar("reshopTrxId", reshop.payloadAttributes && reshop.payloadAttributes.trxId, { persist: true });
+    const provider = reshop.augmentationPoint && reshop.augmentationPoint.provider;
+    const shoppingResponseId = provider && provider.nfShoppingResponseId;
+    if (shoppingResponseId) {
+      bru.setVar("reshopNfShoppingResponseId", shoppingResponseId);
+      bru.setEnvVar("reshopNfShoppingResponseId", shoppingResponseId, { persist: true });
+    }
+
+    const offers = reshop.response &&
+      reshop.response.reshopResults &&
+      reshop.response.reshopResults.reshopOffers &&
+      reshop.response.reshopResults.reshopOffers.offer
+        ? reshop.response.reshopResults.reshopOffers.offer
+        : [];
+    const selectedOffer = Array.isArray(offers) ? offers[0] : offers;
+    const amount = selectedOffer && selectedOffer.totalPrice && selectedOffer.totalPrice.totalAmount;
+    const offerItem = selectedOffer && Array.isArray(selectedOffer.offerItem)
+      ? selectedOffer.offerItem[0]
+      : selectedOffer && selectedOffer.offerItem;
+    const service = offerItem && Array.isArray(offerItem.nameChangeService)
+      ? offerItem.nameChangeService[0]
+      : offerItem && offerItem.nameChangeService;
+    const rawPaxRefIds = service && service.paxRefId;
+    const paxRefIds = Array.isArray(rawPaxRefIds)
+      ? rawPaxRefIds
+      : rawPaxRefIds
+        ? [rawPaxRefIds]
+        : [];
+    const fallbackPaxRefId = bru.getVar("changePassengerId") || bru.getEnvVar("changePassengerId");
+    const paxRefId = paxRefIds[0] || fallbackPaxRefId;
+    // Emirates returns offerItem as null here, while the UI derives the item
+    // reference by appending "-1" to the selected offer ID.
+    const offerItemId = offerItem && offerItem.offerItemId
+      ? offerItem.offerItemId
+      : selectedOffer && selectedOffer.offerId
+        ? selectedOffer.offerId + "-1"
+        : null;
+
+    if (selectedOffer && amount) {
+      bru.setVar("changeOfferId", selectedOffer.offerId);
+      bru.setVar("changeOfferOwnerCode", selectedOffer.ownerCode);
+      bru.setVar("changeOfferAmount", amount && amount.cdata);
+      bru.setVar("changeOfferCurrency", amount && amount.curCode);
+
+      bru.setEnvVar("changeOfferId", selectedOffer.offerId, { persist: true });
+      bru.setEnvVar("changeOfferOwnerCode", selectedOffer.ownerCode, { persist: true });
+      bru.setEnvVar("changeOfferAmount", amount && amount.cdata, { persist: true });
+      bru.setEnvVar("changeOfferCurrency", amount && amount.curCode, { persist: true });
+      if (offerItemId) {
+        bru.setVar("changeOfferItemId", offerItemId);
+        bru.setEnvVar("changeOfferItemId", offerItemId, { persist: true });
+      }
+      if (paxRefId) {
+        bru.setVar("changeOfferPaxRefId", paxRefId);
+        bru.setEnvVar("changeOfferPaxRefId", paxRefId, { persist: true });
+      }
+    } else {
+      // Never allow Change Confirm to reuse an offer from an earlier reshop.
+      [
+        "changeOfferId",
+        "changeOfferOwnerCode",
+        "changeOfferAmount",
+        "changeOfferCurrency",
+        "changeOfferItemId",
+        "changeOfferPaxRefId"
+      ].forEach(name => {
+        bru.deleteVar(name);
+        bru.deleteEnvVar(name);
+      });
+    }
+  }
+}
+
+tests {
+  test("OrderReshop returns HTTP success", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.errors).to.be.undefined;
+  });
+
+  test("OrderReshop returns change offers", function () {
+    const reshop = res.body.data.iataOrderReshop;
+    const errors = reshop.error || [];
+    const offers = reshop.response &&
+      reshop.response.reshopResults &&
+      reshop.response.reshopResults.reshopOffers &&
+      reshop.response.reshopResults.reshopOffers.offer || [];
+
+    expect(errors.length).to.equal(0);
+    expect(offers.length).to.be.greaterThan(0);
+    expect(offers[0].offerId).to.be.a("string").and.not.empty;
+    expect(offers[0].ownerCode).to.be.a("string").and.not.empty;
+  });
+
+  test("OrderReshop returns a reusable transaction id", function () {
+    const reshop = res.body.data.iataOrderReshop;
+
+    expect(reshop.payloadAttributes).to.be.an("object");
+    expect(reshop.payloadAttributes.trxId).to.be.a("string").and.not.empty;
+  });
+
+  test("first Emirates change offer contains price details", function () {
+    const reshop = res.body.data.iataOrderReshop;
+    const rawOffers = reshop.response.reshopResults.reshopOffers.offer;
+    const offers = Array.isArray(rawOffers) ? rawOffers : [rawOffers];
+    const offer = offers[0];
+    const amount = offer.totalPrice && offer.totalPrice.totalAmount;
+
+    expect(offer.offerId).to.be.a("string").and.not.empty;
+    expect(offer.ownerCode).to.be.a("string").and.not.empty;
+    expect(amount.cdata).to.exist;
+    expect(amount.curCode).to.be.a("string").and.not.empty;
+  });
+
+}

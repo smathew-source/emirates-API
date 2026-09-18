@@ -1,0 +1,103 @@
+[
+  {
+    "pipeline": "PL_SourceRowCounts",
+    "runId": "27f63c9a-4774-44a7-becb-d618b088551a",
+    "status": "Succeeded",
+    "activities": [
+      {
+        "name": "CountSourceRows",
+        "status": "Succeeded",
+        "error": {
+          "details": "",
+          "errorCode": "",
+          "failureType": "",
+          "message": "",
+          "target": "CountSourceRows"
+        },
+        "resultSets": [
+          {
+            "rowCount": 3,
+            "rows": [
+              {
+                "RowCount": 6,
+                "TableName": "Patient"
+              },
+              {
+                "RowCount": 3,
+                "TableName": "Doctor"
+              },
+              {
+                "RowCount": 8,
+                "TableName": "Appointment"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pipeline": "PL_WarehouseQualityCheck",
+    "runId": "0a9b1283-5bd9-4276-a394-d9fa911a7c90",
+    "status": "Succeeded",
+    "activities": [
+      {
+        "name": "CheckWarehouseQuality",
+        "status": "Succeeded",
+        "error": {
+          "details": "",
+          "errorCode": "",
+          "failureType": "",
+          "message": "",
+          "target": "CheckWarehouseQuality"
+        },
+        "resultSets": [
+          {
+            "rowCount": 1,
+            "rows": [
+              {
+                "AppointmentAmountGBP": "585.00",
+                "AppointmentRows": 8,
+                "QualityStatus": "Passed"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pipeline": "PL_LatestLoadAudit",
+    "runId": "eb835c4a-2e87-4be6-ba2e-5b102dacfec1",
+    "status": "Succeeded",
+    "activities": [
+      {
+        "name": "ReadLatestLoadAudit",
+        "status": "Succeeded",
+        "error": {
+          "details": "",
+          "errorCode": "",
+          "failureType": "",
+          "message": "",
+          "target": "ReadLatestLoadAudit"
+        },
+        "resultSets": [
+          {
+            "rowCount": 1,
+            "rows": [
+              {
+                "AppointmentAmountGBP": "585.00",
+                "AppointmentRows": 8,
+                "DoctorRows": 3,
+                "LoadedAtUtc": "2026-09-12T21:24:14Z",
+                "MinutesSinceLoad": 1,
+                "PatientRows": 6,
+                "RunId": "d3d9d901-35c4-4065-8615-055f6fc1fb5a"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

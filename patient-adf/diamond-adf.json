@@ -1,0 +1,736 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "resources": [
+    {
+      "type": "Microsoft.DataFactory/factories",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa",
+      "location": "uksouth",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {}
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/LS_Diamond02",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories','adf-diamond-clinical-91685bfa')]"
+      ],
+      "properties": {
+        "type": "AzureSqlDatabase",
+        "typeProperties": {
+          "server": "diamond-clinical-91685bfa.database.windows.net",
+          "database": "Diamond02",
+          "authenticationType": "SystemAssignedManagedIdentity",
+          "encrypt": "mandatory",
+          "trustServerCertificate": false
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/LS_DiamondWarehouse",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories','adf-diamond-clinical-91685bfa')]"
+      ],
+      "properties": {
+        "type": "AzureSqlDatabase",
+        "typeProperties": {
+          "server": "diamond-clinical-91685bfa.database.windows.net",
+          "database": "DiamondWarehouse",
+          "authenticationType": "SystemAssignedManagedIdentity",
+          "encrypt": "mandatory",
+          "trustServerCertificate": false
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/LS_DatabricksLearning",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories','adf-diamond-clinical-91685bfa')]"
+      ],
+      "properties": {
+        "type": "AzureDatabricks",
+        "parameters": {
+          "workspaceUrl": {
+            "type": "String"
+          },
+          "existingClusterId": {
+            "type": "String"
+          }
+        },
+        "typeProperties": {
+          "domain": "@{linkedService().workspaceUrl}",
+          "existingClusterId": "@{linkedService().existingClusterId}"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/DS_SourcePatient",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', 'adf-diamond-clinical-91685bfa', 'LS_Diamond02')]"
+      ],
+      "properties": {
+        "type": "AzureSqlTable",
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_Diamond02"
+        },
+        "typeProperties": {
+          "schema": "dbo",
+          "table": "Patient"
+        },
+        "schema": []
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/DS_StagePatient",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', 'adf-diamond-clinical-91685bfa', 'LS_DiamondWarehouse')]"
+      ],
+      "properties": {
+        "type": "AzureSqlTable",
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_DiamondWarehouse"
+        },
+        "typeProperties": {
+          "schema": "stg",
+          "table": "Patient"
+        },
+        "schema": []
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/DS_SourceDoctor",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', 'adf-diamond-clinical-91685bfa', 'LS_Diamond02')]"
+      ],
+      "properties": {
+        "type": "AzureSqlTable",
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_Diamond02"
+        },
+        "typeProperties": {
+          "schema": "dbo",
+          "table": "Doctor"
+        },
+        "schema": []
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/DS_StageDoctor",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', 'adf-diamond-clinical-91685bfa', 'LS_DiamondWarehouse')]"
+      ],
+      "properties": {
+        "type": "AzureSqlTable",
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_DiamondWarehouse"
+        },
+        "typeProperties": {
+          "schema": "stg",
+          "table": "Doctor"
+        },
+        "schema": []
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/DS_SourceAppointment",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', 'adf-diamond-clinical-91685bfa', 'LS_Diamond02')]"
+      ],
+      "properties": {
+        "type": "AzureSqlTable",
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_Diamond02"
+        },
+        "typeProperties": {
+          "schema": "dbo",
+          "table": "Appointment"
+        },
+        "schema": []
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/DS_StageAppointment",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', 'adf-diamond-clinical-91685bfa', 'LS_DiamondWarehouse')]"
+      ],
+      "properties": {
+        "type": "AzureSqlTable",
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_DiamondWarehouse"
+        },
+        "typeProperties": {
+          "schema": "stg",
+          "table": "Appointment"
+        },
+        "schema": []
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/pipelines",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/PL_DiamondSnowflake",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/datasets', 'adf-diamond-clinical-91685bfa', 'DS_SourcePatient')]",
+        "[resourceId('Microsoft.DataFactory/factories/datasets', 'adf-diamond-clinical-91685bfa', 'DS_StagePatient')]",
+        "[resourceId('Microsoft.DataFactory/factories/datasets', 'adf-diamond-clinical-91685bfa', 'DS_SourceDoctor')]",
+        "[resourceId('Microsoft.DataFactory/factories/datasets', 'adf-diamond-clinical-91685bfa', 'DS_StageDoctor')]",
+        "[resourceId('Microsoft.DataFactory/factories/datasets', 'adf-diamond-clinical-91685bfa', 'DS_SourceAppointment')]",
+        "[resourceId('Microsoft.DataFactory/factories/datasets', 'adf-diamond-clinical-91685bfa', 'DS_StageAppointment')]"
+      ],
+      "properties": {
+        "concurrency": 1,
+        "annotations": [
+          "Synthetic clinical data",
+          "Full refresh staging; Type 1 dimensions; manual trigger"
+        ],
+        "activities": [
+          {
+            "name": "CopyPatient",
+            "type": "Copy",
+            "policy": {
+              "timeout": "0.00:15:00",
+              "retry": 2,
+              "retryIntervalInSeconds": 30,
+              "secureInput": true,
+              "secureOutput": false
+            },
+            "dependsOn": [],
+            "inputs": [
+              {
+                "type": "DatasetReference",
+                "referenceName": "DS_SourcePatient"
+              }
+            ],
+            "outputs": [
+              {
+                "type": "DatasetReference",
+                "referenceName": "DS_StagePatient"
+              }
+            ],
+            "typeProperties": {
+              "source": {
+                "type": "AzureSqlSource",
+                "sqlReaderQuery": "SELECT PatientId,GivenName,FamilyName,DateOfBirth,City,Email,CreatedAtUtc FROM dbo.Patient",
+                "partitionOption": "None",
+                "queryTimeout": "00:10:00"
+              },
+              "sink": {
+                "type": "AzureSqlSink",
+                "preCopyScript": "EXEC etl.ResetPatient;",
+                "writeBehavior": "insert"
+              },
+              "enableStaging": false,
+              "translator": {
+                "type": "TabularTranslator",
+                "mappings": [
+                  {
+                    "source": {
+                      "name": "PatientId"
+                    },
+                    "sink": {
+                      "name": "PatientId"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "GivenName"
+                    },
+                    "sink": {
+                      "name": "GivenName"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "FamilyName"
+                    },
+                    "sink": {
+                      "name": "FamilyName"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "DateOfBirth"
+                    },
+                    "sink": {
+                      "name": "DateOfBirth"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "City"
+                    },
+                    "sink": {
+                      "name": "City"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "Email"
+                    },
+                    "sink": {
+                      "name": "Email"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "CreatedAtUtc"
+                    },
+                    "sink": {
+                      "name": "CreatedAtUtc"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "CopyDoctor",
+            "type": "Copy",
+            "policy": {
+              "timeout": "0.00:15:00",
+              "retry": 2,
+              "retryIntervalInSeconds": 30,
+              "secureInput": true,
+              "secureOutput": false
+            },
+            "dependsOn": [
+              {
+                "activity": "CopyPatient",
+                "dependencyConditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "inputs": [
+              {
+                "type": "DatasetReference",
+                "referenceName": "DS_SourceDoctor"
+              }
+            ],
+            "outputs": [
+              {
+                "type": "DatasetReference",
+                "referenceName": "DS_StageDoctor"
+              }
+            ],
+            "typeProperties": {
+              "source": {
+                "type": "AzureSqlSource",
+                "sqlReaderQuery": "SELECT DoctorId,GivenName,FamilyName,Specialty,Email,IsActive FROM dbo.Doctor",
+                "partitionOption": "None",
+                "queryTimeout": "00:10:00"
+              },
+              "sink": {
+                "type": "AzureSqlSink",
+                "preCopyScript": "EXEC etl.ResetDoctor;",
+                "writeBehavior": "insert"
+              },
+              "enableStaging": false,
+              "translator": {
+                "type": "TabularTranslator",
+                "mappings": [
+                  {
+                    "source": {
+                      "name": "DoctorId"
+                    },
+                    "sink": {
+                      "name": "DoctorId"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "GivenName"
+                    },
+                    "sink": {
+                      "name": "GivenName"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "FamilyName"
+                    },
+                    "sink": {
+                      "name": "FamilyName"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "Specialty"
+                    },
+                    "sink": {
+                      "name": "Specialty"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "Email"
+                    },
+                    "sink": {
+                      "name": "Email"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "IsActive"
+                    },
+                    "sink": {
+                      "name": "IsActive"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "CopyAppointment",
+            "type": "Copy",
+            "policy": {
+              "timeout": "0.00:15:00",
+              "retry": 2,
+              "retryIntervalInSeconds": 30,
+              "secureInput": true,
+              "secureOutput": false
+            },
+            "dependsOn": [
+              {
+                "activity": "CopyDoctor",
+                "dependencyConditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "inputs": [
+              {
+                "type": "DatasetReference",
+                "referenceName": "DS_SourceAppointment"
+              }
+            ],
+            "outputs": [
+              {
+                "type": "DatasetReference",
+                "referenceName": "DS_StageAppointment"
+              }
+            ],
+            "typeProperties": {
+              "source": {
+                "type": "AzureSqlSource",
+                "sqlReaderQuery": "SELECT AppointmentId,PatientId,DoctorId,StartsAtUtc,EndsAtUtc,Status,Reason,CostGBP,CreatedAtUtc FROM dbo.Appointment",
+                "partitionOption": "None",
+                "queryTimeout": "00:10:00"
+              },
+              "sink": {
+                "type": "AzureSqlSink",
+                "preCopyScript": "EXEC etl.ResetAppointment;",
+                "writeBehavior": "insert"
+              },
+              "enableStaging": false,
+              "translator": {
+                "type": "TabularTranslator",
+                "mappings": [
+                  {
+                    "source": {
+                      "name": "AppointmentId"
+                    },
+                    "sink": {
+                      "name": "AppointmentId"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "PatientId"
+                    },
+                    "sink": {
+                      "name": "PatientId"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "DoctorId"
+                    },
+                    "sink": {
+                      "name": "DoctorId"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "StartsAtUtc"
+                    },
+                    "sink": {
+                      "name": "StartsAtUtc"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "EndsAtUtc"
+                    },
+                    "sink": {
+                      "name": "EndsAtUtc"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "Status"
+                    },
+                    "sink": {
+                      "name": "Status"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "Reason"
+                    },
+                    "sink": {
+                      "name": "Reason"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "CostGBP"
+                    },
+                    "sink": {
+                      "name": "CostGBP"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "CreatedAtUtc"
+                    },
+                    "sink": {
+                      "name": "CreatedAtUtc"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "LookupStagingAppointmentCount",
+            "type": "Lookup",
+            "policy": {
+              "timeout": "0.00:15:00",
+              "retry": 2,
+              "retryIntervalInSeconds": 30,
+              "secureInput": true,
+              "secureOutput": false
+            },
+            "dependsOn": [
+              {
+                "activity": "CopyAppointment",
+                "dependencyConditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "linkedServiceName": {
+              "type": "LinkedServiceReference",
+              "referenceName": "LS_DiamondWarehouse"
+            },
+            "typeProperties": {
+              "source": {
+                "type": "AzureSqlSource",
+                "sqlReaderQuery": "SELECT COUNT(*) AS AppointmentRows FROM stg.Appointment"
+              },
+              "dataset": {
+                "referenceName": "DS_StageAppointment",
+                "type": "DatasetReference"
+              },
+              "firstRowOnly": true
+            }
+          },
+          {
+            "name": "LoadSnowflake",
+            "type": "SqlServerStoredProcedure",
+            "policy": {
+              "timeout": "0.00:15:00",
+              "retry": 2,
+              "retryIntervalInSeconds": 30,
+              "secureInput": true,
+              "secureOutput": false
+            },
+            "dependsOn": [
+              {
+                "activity": "LookupStagingAppointmentCount",
+                "dependencyConditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "linkedServiceName": {
+              "type": "LinkedServiceReference",
+              "referenceName": "LS_DiamondWarehouse"
+            },
+            "typeProperties": {
+              "storedProcedureName": "dw.LoadAppointments",
+              "storedProcedureParameters": {
+                "RunId": {
+                  "type": "Guid",
+                  "value": {
+                    "value": "@pipeline().RunId",
+                    "type": "Expression"
+                  }
+                },
+                "PatientRows": {
+                  "type": "Int32",
+                  "value": {
+                    "value": "@activity('CopyPatient').output.rowsCopied",
+                    "type": "Expression"
+                  }
+                },
+                "DoctorRows": {
+                  "type": "Int32",
+                  "value": {
+                    "value": "@activity('CopyDoctor').output.rowsCopied",
+                    "type": "Expression"
+                  }
+                },
+                "AppointmentRows": {
+                  "type": "Int32",
+                  "value": {
+                    "value": "@activity('LookupStagingAppointmentCount').output.firstRow.AppointmentRows",
+                    "type": "Expression"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "ValidateWarehouse",
+            "type": "Script",
+            "policy": {
+              "timeout": "0.00:15:00",
+              "retry": 2,
+              "retryIntervalInSeconds": 30,
+              "secureInput": true,
+              "secureOutput": false
+            },
+            "dependsOn": [
+              {
+                "activity": "LoadSnowflake",
+                "dependencyConditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "linkedServiceName": {
+              "type": "LinkedServiceReference",
+              "referenceName": "LS_DiamondWarehouse"
+            },
+            "typeProperties": {
+              "scripts": [
+                {
+                  "type": "Query",
+                  "text": "IF EXISTS (SELECT 1 FROM dw.FactAppointment f\n    LEFT JOIN dw.DimPatient p ON p.PatientKey=f.PatientKey\n    LEFT JOIN dw.DimDoctor d ON d.DoctorKey=f.DoctorKey\n    LEFT JOIN dw.DimDate t ON t.DateKey=f.DateKey\n    WHERE p.PatientKey IS NULL OR d.DoctorKey IS NULL OR t.DateKey IS NULL\n       OR f.CostGBP < 0 OR f.EndsAtUtc <= f.StartsAtUtc)\n    THROW 51010, 'Warehouse validation failed.', 1;\nSELECT COUNT(*) AS ValidatedFactRows, COALESCE(SUM(CostGBP), 0) AS ValidatedCostGBP\nFROM dw.FactAppointment;"
+                }
+              ],
+              "scriptBlockExecutionTimeout": "00:02:00"
+            }
+          },
+          {
+            "name": "DatabricksLearningStep",
+            "type": "DatabricksNotebook",
+            "state": "Disabled",
+            "policy": {
+              "timeout": "0.00:15:00",
+              "retry": 2,
+              "retryIntervalInSeconds": 30,
+              "secureInput": true,
+              "secureOutput": false
+            },
+            "dependsOn": [
+              {
+                "activity": "ValidateWarehouse",
+                "dependencyConditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "linkedServiceName": {
+              "type": "LinkedServiceReference",
+              "referenceName": "LS_DatabricksLearning",
+              "parameters": {
+                "workspaceUrl": {
+                  "value": "https://REPLACE-WITH-WORKSPACE.azuredatabricks.net",
+                  "type": "String"
+                },
+                "existingClusterId": {
+                  "value": "REPLACE-WITH-CLUSTER-ID",
+                  "type": "String"
+                }
+              }
+            },
+            "typeProperties": {
+              "notebookPath": "/Shared/etl-learning/validate-warehouse",
+              "baseParameters": {
+                "pipelineRunId": {
+                  "value": "@pipeline().RunId",
+                  "type": "Expression"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/triggers",
+      "apiVersion": "2018-06-01",
+      "name": "adf-diamond-clinical-91685bfa/TR_DiamondSnowflake_Daily",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/pipelines', 'adf-diamond-clinical-91685bfa', 'PL_DiamondSnowflake')]"
+      ],
+      "properties": {
+        "type": "ScheduleTrigger",
+        "runtimeState": "Stopped",
+        "typeProperties": {
+          "recurrence": {
+            "frequency": "Day",
+            "interval": 1,
+            "startTime": "2026-09-14T02:00:00Z",
+            "timeZone": "UTC"
+          }
+        },
+        "pipelines": [
+          {
+            "pipelineReference": {
+              "type": "PipelineReference",
+              "referenceName": "PL_DiamondSnowflake"
+            },
+            "parameters": {}
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "factoryPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.DataFactory/factories','adf-diamond-clinical-91685bfa'), '2018-06-01', 'Full').identity.principalId]"
+    }
+  }
+}

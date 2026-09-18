@@ -1,0 +1,190 @@
+meta {
+  name: Order Retrieve Before Issue
+  type: graphql
+  seq: 4
+}
+
+post {
+  url: {{apiBaseUrl}}
+  body: graphql
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Referer: https://workbench.staging.llc.nuflights.com/
+  authorization: {{ndcAuthorization}}
+  x-nf-active-org-short-code: {{activeOrgShortCode}}
+}
+
+body:graphql {
+  query ndcOrderRetrieve1Query($rq: OrderRetrieveRqInput!) {
+    iataOrderRetrieve(rq: $rq) {
+      error {
+        code
+        descText
+      }
+      payloadAttributes {
+        trxId
+      }
+      augmentationPoint {
+        agency {
+          addServiceFeeToBaseFare
+        }
+      }
+      response {
+        order {
+          orderId
+          ownerCode
+          totalPrice {
+            totalAmount {
+              cdata
+              curCode
+            }
+          }
+          orderItem {
+            orderItemId
+            service {
+              serviceId
+              paxRefId
+            }
+          }
+        }
+        dataLists {
+          paxSegmentList {
+            paxSegment {
+              paxSegmentId
+              datedMarketingSegmentRefId
+            }
+          }
+          datedMarketingSegmentList {
+            datedMarketingSegment {
+              datedMarketingSegmentId
+              carrierDesigCode
+              marketingCarrierFlightNumberText
+              dep {
+                aircraftScheduledDateTime
+                iataLocationCode
+                stationName
+                terminalName
+              }
+              arrival {
+                aircraftScheduledDateTime
+                iataLocationCode
+                stationName
+                terminalName
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "rq": {
+      "pos": {
+        "country": {
+          "countryCode": "{{servicingCountryCode}}"
+        }
+      },
+      "augmentationPoint": {
+        "common": {
+          "nfSubscriptionId": "{{createdNfSubscriptionId}}",
+          "nfOrderId": "{{createdNfOrderId}}"
+        }
+      },
+      "distributionChain": {
+        "distributionChainLink": [
+          {
+            "ordinal": 1,
+            "orgRole": "SELLER",
+            "participatingOrg": {
+              "orgId": "{{servicingOrgId}}"
+            }
+          }
+        ]
+      },
+      "payloadAttributes": {
+        "trxId": null
+      },
+      "request": {
+        "orderValidationFilterCriteria": {
+          "orderFilterCriteria": {
+            "orderId": "{{createdOrderId}}",
+            "ownerCode": "{{createdOwnerCode}}"
+          }
+        }
+      }
+    }
+  }
+}
+
+script:pre-request {
+  const required = ["createdNfOrderId", "createdNfSubscriptionId", "createdOrderId", "createdOwnerCode"];
+  const missing = required.filter(name => !(bru.getVar(name) || bru.getEnvVar(name)));
+  if (missing.length) {
+    throw new Error("Run a successful fresh Order Create first; missing: " + missing.join(", "));
+  }
+}
+
+script:post-response {
+  const retrieve = res.body.data && res.body.data.iataOrderRetrieve;
+
+  if (retrieve && retrieve.response) {
+    const order = Array.isArray(retrieve.response.order)
+      ? retrieve.response.order[0]
+      : retrieve.response.order;
+    const orderItem = order.orderItem && order.orderItem[0];
+    const service = orderItem && orderItem.service && orderItem.service[0];
+
+    bru.setVar("retrievedOrderTrxId", retrieve.payloadAttributes.trxId);
+    bru.setVar("retrievedOrderId", order.orderId);
+    bru.setVar("retrievedOwnerCode", order.ownerCode);
+    bru.setVar("retrievedTotalAmount", order.totalPrice.totalAmount.cdata);
+    bru.setVar("retrievedCurrency", order.totalPrice.totalAmount.curCode);
+
+    bru.setEnvVar("retrievedOrderTrxId", retrieve.payloadAttributes.trxId, { persist: true });
+    bru.setEnvVar("retrievedOrderId", order.orderId, { persist: true });
+    bru.setEnvVar("retrievedOwnerCode", order.ownerCode, { persist: true });
+    bru.setEnvVar("retrievedTotalAmount", order.totalPrice.totalAmount.cdata, { persist: true });
+    bru.setEnvVar("retrievedCurrency", order.totalPrice.totalAmount.curCode, { persist: true });
+
+    if (orderItem) {
+      bru.setVar("retrievedOrderItemId", orderItem.orderItemId);
+      bru.setEnvVar("retrievedOrderItemId", orderItem.orderItemId, { persist: true });
+    }
+
+    if (service) {
+      const paxRefIds = Array.isArray(service.paxRefId)
+        ? service.paxRefId
+        : service.paxRefId
+          ? [service.paxRefId]
+          : [];
+      bru.setVar("retrievedServiceId", service.serviceId);
+      bru.setEnvVar("retrievedServiceId", service.serviceId, { persist: true });
+      if (paxRefIds.length) {
+        bru.setVar("retrievedPaxRefId", paxRefIds[0]);
+        bru.setEnvVar("retrievedPaxRefId", paxRefIds[0], { persist: true });
+      }
+    }
+  }
+}
+
+tests {
+  test("OrderRetrieve before issue succeeds", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.errors).to.be.undefined;
+  });
+
+  test("retrieves created order", function () {
+    const retrieve = res.body.data.iataOrderRetrieve;
+    const errors = retrieve.error || [];
+    const blockingErrors = errors.filter(error => error.code !== "NFE-NDC-TTL-INCORRECT");
+    expect(blockingErrors.length).to.equal(0);
+    expect(retrieve.response.order).to.exist;
+  });
+}

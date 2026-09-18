@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "value": "uksouth" },
+    "factoryName": { "value": "REPLACE_WITH_UNIQUE_FACTORY_NAME" },
+    "sqlServerName": { "value": "replace-with-unique-sql-server-name" },
+    "sourceDatabase": { "value": "PatientSource" },
+    "warehouseDatabase": { "value": "PatientWarehouse" },
+    "entraAdminName": { "value": "REPLACE_WITH_ENTRA_ADMIN_NAME" },
+    "entraAdminObjectId": { "value": "REPLACE_WITH_ENTRA_OBJECT_ID" },
+    "entraAdminPrincipalType": { "value": "User" },
+    "operatorIPv4": { "value": "REPLACE_WITH_YOUR_PUBLIC_IPV4" },
+    "allowAzureServices": { "value": false }
+  }
+}

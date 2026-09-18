@@ -1,0 +1,38 @@
+{
+  "properties": {
+    "description": "Show the latest successful warehouse load and its age in minutes. No result rows means no successful load.",
+    "folder": {
+      "name": "Simple examples"
+    },
+    "concurrency": 1,
+    "annotations": [
+      "Read only",
+      "Manual trigger"
+    ],
+    "activities": [
+      {
+        "name": "ReadLatestLoadAudit",
+        "type": "Script",
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 0,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_DiamondWarehouse"
+        },
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "Query",
+              "text": "EXEC etl.GetLatestLoadAudit;"
+            }
+          ],
+          "scriptBlockExecutionTimeout": "00:02:00"
+        }
+      }
+    ]
+  }
+}

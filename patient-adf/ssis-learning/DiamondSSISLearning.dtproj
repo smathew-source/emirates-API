@@ -1,0 +1,56 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns:SSIS="www.microsoft.com/SqlServer/SSIS" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <DeploymentModel>Project</DeploymentModel>
+  <ProductVersion>17.0.1010.6</ProductVersion>
+  <SchemaVersion>9.0.1.0</SchemaVersion>
+  <DeploymentModelSpecificContent>
+    <Manifest>
+      <SSIS:Project SSIS:ProtectionLevel="DontSaveSensitive">
+        <SSIS:Properties>
+          <SSIS:Property SSIS:Name="ID">{60D804B1-B7B8-4811-BB15-7399CE196AD5}</SSIS:Property>
+          <SSIS:Property SSIS:Name="Name">DiamondSSISLearning</SSIS:Property>
+          <SSIS:Property SSIS:Name="VersionMajor">1</SSIS:Property>
+          <SSIS:Property SSIS:Name="VersionMinor">0</SSIS:Property>
+          <SSIS:Property SSIS:Name="VersionBuild">0</SSIS:Property>
+          <SSIS:Property SSIS:Name="FormatVersion">1</SSIS:Property>
+          <SSIS:Property SSIS:Name="Description">Read-only SSIS learning package</SSIS:Property>
+        </SSIS:Properties>
+        <SSIS:Packages>
+          <SSIS:Package SSIS:Name="Diamond_SSIS_Learning.dtsx" SSIS:EntryPoint="1" />
+        </SSIS:Packages>
+        <SSIS:ConnectionManagers />
+        <SSIS:DeploymentInfo>
+          <SSIS:ProjectConnectionParameters />
+          <SSIS:PackageInfo>
+            <SSIS:PackageMetaData SSIS:Name="Diamond_SSIS_Learning.dtsx">
+              <SSIS:Properties>
+                <SSIS:Property SSIS:Name="ID">{E8104894-950E-5C16-84EE-3474D028CDEC}</SSIS:Property>
+                <SSIS:Property SSIS:Name="Name">Diamond_SSIS_Learning</SSIS:Property>
+                <SSIS:Property SSIS:Name="VersionMajor">1</SSIS:Property>
+                <SSIS:Property SSIS:Name="VersionMinor">0</SSIS:Property>
+                <SSIS:Property SSIS:Name="VersionBuild">0</SSIS:Property>
+                <SSIS:Property SSIS:Name="PackageFormatVersion">8</SSIS:Property>
+                <SSIS:Property SSIS:Name="ProtectionLevel">0</SSIS:Property>
+              </SSIS:Properties>
+              <SSIS:Parameters />
+            </SSIS:PackageMetaData>
+          </SSIS:PackageInfo>
+        </SSIS:DeploymentInfo>
+      </SSIS:Project>
+    </Manifest>
+  </DeploymentModelSpecificContent>
+  <ControlFlowParts />
+  <Miscellaneous />
+  <Configurations>
+    <Configuration>
+      <Name>Development</Name>
+      <Options>
+        <OutputPath>bin</OutputPath>
+        <TargetServerVersion>SQLServer2022</TargetServerVersion>
+      </Options>
+    </Configuration>
+  </Configurations>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{60D804B1-B7B8-4811-BB15-7399CE196AD5}</ProjectGuid>
+  </PropertyGroup>
+</Project>

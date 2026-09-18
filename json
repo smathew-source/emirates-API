@@ -1,0 +1,166 @@
+[
+  {
+    "iterationIndex": 0,
+    "results": [
+      {
+        "test": {
+          "filename": "Order Servicing\\Order Change Confirm.bru"
+        },
+        "request": {
+          "method": "POST",
+          "url": "********",
+          "headers": {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Referer": "https://workbench.staging.llc.nuflights.com/",
+            "authorization": "********",
+            "x-nf-active-org-short-code": "T-DTT"
+          },
+          "data": {
+            "query": "mutation ndcOrderChangeConfirmMutation($rq: OrderChangeRqInput!) {\n  iataOrderChange(rq: $rq) {\n    payloadAttributes {\n      trxId\n    }\n    augmentationPoint {\n      common {\n        nfOrderId\n        nfSubscriptionId\n      }\n    }\n    response {\n      order {\n        orderId\n        ownerCode\n        orderItem {\n          orderItemId\n          service {\n            serviceId\n            paxRefId\n            statusCode\n          }\n        }\n        totalPrice {\n          totalAmount {\n            cdata\n            curCode\n          }\n        }\n      }\n    }\n    error {\n      code\n      descText\n      typeCode\n      statusText\n    }\n  }\n}",
+            "variables": {
+              "rq": {
+                "augmentationPoint": {
+                  "common": {
+                    "nfSubscriptionId": "645ac8c9-fc24-4a48-bd6d-6696b75dee8d",
+                    "nfOrderId": "N-704315SLY"
+                  }
+                },
+                "distributionChain": {
+                  "distributionChainLink": [
+                    {
+                      "ordinal": 1,
+                      "orgRole": "SELLER",
+                      "participatingOrg": {
+                        "orgId": ""
+                      }
+                    }
+                  ]
+                },
+                "payloadAttributes": {
+                  "trxId": "38402551-cb78-4ef7-b282-52d63a5240d7"
+                },
+                "pos": {
+                  "country": {
+                    "countryCode": "IN"
+                  }
+                },
+                "request": {
+                  "order": {
+                    "orderId": "EK176GKK5A1A3",
+                    "ownerCode": "EK"
+                  },
+                  "changeOrderChoice": {
+                    "acceptSelectedQuotedOfferList": {
+                      "selectedPricedOffer": [
+                        {
+                          "offerRefId": "RD75ACB1B-81AE-49F9-BFF6-1",
+                          "ownerCode": "EK",
+                          "selectedOfferItem": [],
+                          "totalOfferPriceAmount": {
+                            "cdata": "2350.0",
+                            "curCode": "QAR"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "orderChangeParameters": {
+                    "pricingParameter": {
+                      "overrideCurCode": "QAR"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "response": {
+          "status": 401,
+          "statusText": "Unauthorized",
+          "headers": {
+            "date": "Wed, 12 Aug 2026 22:54:01 GMT",
+            "content-type": "application/json",
+            "content-length": "54",
+            "connection": "close",
+            "access-control-allow-credentials": "true",
+            "server-timing": "total;dur=0",
+            "vary": "Origin, accept-encoding, Origin, Access-Control-Request-Method, Access-Control-Request-Headers",
+            "x-ratelimit-limit": "0",
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": "0",
+            "x-tyk-trace-id": "19f8ba5b607b41d6419c75faa1059be9"
+          },
+          "data": {
+            "error": "Unauthorized: invalid or expired token"
+          },
+          "url": "********",
+          "responseTime": 223,
+          "duration": 223,
+          "size": 50
+        },
+        "error": null,
+        "status": "pass",
+        "assertionResults": [],
+        "testResults": [
+          {
+            "description": "OrderChange confirm returns HTTP success",
+            "status": "fail",
+            "error": "expected 401 to equal 200",
+            "uid": "0YGCCIC4FBhaAXjmwRHvv"
+          },
+          {
+            "description": "OrderChange confirm has no business errors",
+            "status": "fail",
+            "error": "cannot read property 'iataOrderChange' of undefined",
+            "uid": "IvvjYxrYeNhb6122JvmId"
+          },
+          {
+            "description": "OrderChange confirm returns a transaction id",
+            "status": "fail",
+            "error": "cannot read property 'iataOrderChange' of undefined",
+            "uid": "meksBBtSK3pSjLWiq1tDv"
+          },
+          {
+            "description": "OrderChange confirm returns the confirmed booking",
+            "status": "fail",
+            "error": "cannot read property 'iataOrderChange' of undefined",
+            "uid": "PzQn5Poh1FyJ4YRJ4GGzc"
+          },
+          {
+            "description": "confirmed booking contains service and price details",
+            "status": "fail",
+            "error": "cannot read property 'iataOrderChange' of undefined",
+            "uid": "ZLIPaPulCXVCHG61jOStG"
+          }
+        ],
+        "preRequestTestResults": [],
+        "postResponseTestResults": [],
+        "shouldStopRunnerExecution": false,
+        "runDuration": 1.0484822,
+        "name": "Order Change Confirm",
+        "path": "Order Servicing\\Order Change Confirm",
+        "iterationIndex": 0
+      }
+    ],
+    "summary": {
+      "totalRequests": 1,
+      "passedRequests": 0,
+      "failedRequests": 1,
+      "errorRequests": 0,
+      "skippedRequests": 0,
+      "totalAssertions": 0,
+      "passedAssertions": 0,
+      "failedAssertions": 0,
+      "totalTests": 5,
+      "passedTests": 0,
+      "failedTests": 5,
+      "totalPreRequestTests": 0,
+      "passedPreRequestTests": 0,
+      "failedPreRequestTests": 0,
+      "totalPostResponseTests": 0,
+      "passedPostResponseTests": 0,
+      "failedPostResponseTests": 0
+    }
+  }
+]

@@ -1,0 +1,38 @@
+{
+  "properties": {
+    "description": "Fail on an empty appointment warehouse or invalid appointment relationships and values; otherwise show totals.",
+    "folder": {
+      "name": "Simple examples"
+    },
+    "concurrency": 1,
+    "annotations": [
+      "Read only",
+      "Manual trigger"
+    ],
+    "activities": [
+      {
+        "name": "CheckWarehouseQuality",
+        "type": "Script",
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 0,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_DiamondWarehouse"
+        },
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "Query",
+              "text": "EXEC etl.CheckWarehouseQuality;"
+            }
+          ],
+          "scriptBlockExecutionTimeout": "00:02:00"
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,57 @@
+<?xml version='1.0' encoding='utf-8'?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" DTS:refId="Package" DTS:CreationName="Microsoft.Package" DTS:DTSID="{E8104894-950E-5C16-84EE-3474D028CDEC}" DTS:ExecutableType="Microsoft.Package" DTS:ObjectName="Diamond_SSIS_Learning" DTS:ProtectionLevel="0" DTS:DelayValidation="True" DTS:MaxConcurrentExecutables="1" DTS:MaxErrorCount="1" DTS:VersionMajor="1" DTS:VersionMinor="0" DTS:Description="Read-only SSIS learning package. Three Execute SQL tasks; no ETL writes.">
+  <DTS:Property DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[CM_Diamond02]" DTS:CreationName="OLEDB" DTS:DTSID="{55FEEED2-AF9E-51FF-BD7F-8FCB83B610CC}" DTS:ObjectName="CM_Diamond02" DTS:DelayValidation="True">
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Provider=MSOLEDBSQL19;Data Source=diamond-clinical-91685bfa.database.windows.net;Initial Catalog=Diamond02;Authentication=ActiveDirectoryInteractive;User ID=sinimannanathu@gmail.com;Use Encryption for Data=Mandatory;Trust Server Certificate=False;Persist Security Info=False;" DTS:Retain="True" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+    <DTS:ConnectionManager DTS:refId="Package.ConnectionManagers[CM_DiamondWarehouse]" DTS:CreationName="OLEDB" DTS:DTSID="{6DE906B4-3E64-5150-89EB-917D5DDDB5CA}" DTS:ObjectName="CM_DiamondWarehouse" DTS:DelayValidation="True">
+      <DTS:ObjectData>
+        <DTS:ConnectionManager DTS:ConnectionString="Provider=MSOLEDBSQL19;Data Source=diamond-clinical-91685bfa.database.windows.net;Initial Catalog=DiamondWarehouse;Authentication=ActiveDirectoryInteractive;User ID=sinimannanathu@gmail.com;Use Encryption for Data=Mandatory;Trust Server Certificate=False;Persist Security Info=False;" DTS:Retain="True" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
+  <DTS:Variables>
+    <DTS:Variable DTS:DTSID="{8E56C6B9-1B86-5466-B9AF-9216F3FE5DEF}" DTS:Namespace="User" DTS:ObjectName="SourceSummary">
+      <DTS:VariableValue DTS:DataType="8">Not run</DTS:VariableValue>
+    </DTS:Variable>
+    <DTS:Variable DTS:DTSID="{797803AE-85DF-57A2-94DF-E750CD110C00}" DTS:Namespace="User" DTS:ObjectName="QualitySummary">
+      <DTS:VariableValue DTS:DataType="8">Not run</DTS:VariableValue>
+    </DTS:Variable>
+    <DTS:Variable DTS:DTSID="{12F99B9F-C192-51BE-A481-784CAEE97648}" DTS:Namespace="User" DTS:ObjectName="LatestLoadSummary">
+      <DTS:VariableValue DTS:DataType="8">Not run</DTS:VariableValue>
+    </DTS:Variable>
+  </DTS:Variables>
+  <DTS:Executables>
+    <DTS:Executable DTS:refId="Package\Read source counts" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{0FA287A7-B425-59FA-B367-8D2B6C849CE5}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Read source counts" DTS:Description="Execute SQL Task: count the source rows and store one summary string in a package variable." DTS:DelayValidation="True" DTS:FailPackageOnFailure="True">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData SQLTask:Connection="{55FEEED2-AF9E-51FF-BD7F-8FCB83B610CC}" SQLTask:SqlStatementSource="SELECT CONCAT('Patients: ',(SELECT COUNT(*) FROM dbo.Patient),'; Doctors: ',(SELECT COUNT(*) FROM dbo.Doctor),'; Appointments: ',(SELECT COUNT(*) FROM dbo.Appointment)) AS Summary;" SQLTask:ResultType="ResultSetType_SingleRow" SQLTask:BypassPrepare="True" SQLTask:TimeOut="60">
+          <SQLTask:ResultBinding SQLTask:ResultName="0" SQLTask:DtsVariableName="User::SourceSummary" />
+        </SQLTask:SqlTaskData>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Check warehouse quality" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{29F4A7EE-941D-538A-AD73-5B4AA3B71433}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Check warehouse quality" DTS:Description="Execute SQL Task: run the existing validation procedure. A SQL error fails the task and stops the success path." DTS:DelayValidation="True" DTS:FailPackageOnFailure="True">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData SQLTask:Connection="{6DE906B4-3E64-5150-89EB-917D5DDDB5CA}" SQLTask:SqlStatementSource="SET NOCOUNT ON; DECLARE @results TABLE(QualityStatus varchar(20),AppointmentRows int,AppointmentAmountGBP decimal(18,2)); INSERT @results EXEC etl.CheckWarehouseQuality; SELECT CONCAT(QualityStatus,'; Appointments: ',AppointmentRows,'; Amount GBP: ',AppointmentAmountGBP) AS Summary FROM @results;" SQLTask:ResultType="ResultSetType_SingleRow" SQLTask:BypassPrepare="True" SQLTask:TimeOut="60">
+          <SQLTask:ResultBinding SQLTask:ResultName="0" SQLTask:DtsVariableName="User::QualitySummary" />
+        </SQLTask:SqlTaskData>
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable DTS:refId="Package\Read latest load audit" DTS:CreationName="Microsoft.ExecuteSQLTask" DTS:DTSID="{2446E1C4-4240-5FAD-99DF-14D4191EDDAE}" DTS:ExecutableType="Microsoft.ExecuteSQLTask" DTS:ObjectName="Read latest load audit" DTS:Description="Execute SQL Task: read the latest successful load and save its summary. No audit row is reported as No successful load yet." DTS:DelayValidation="True" DTS:FailPackageOnFailure="True">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData SQLTask:Connection="{6DE906B4-3E64-5150-89EB-917D5DDDB5CA}" SQLTask:SqlStatementSource="SELECT COALESCE((SELECT TOP (1) CONCAT('Run: ',CONVERT(varchar(36),RunId),'; Loaded UTC: ',CONVERT(varchar(19),LoadedAtUtc,126),'; Appointments: ',AppointmentRows) FROM etl.LoadAudit ORDER BY LoadedAtUtc DESC,RunId DESC),'No successful load yet') AS Summary;" SQLTask:ResultType="ResultSetType_SingleRow" SQLTask:BypassPrepare="True" SQLTask:TimeOut="60">
+          <SQLTask:ResultBinding SQLTask:ResultName="0" SQLTask:DtsVariableName="User::LatestLoadSummary" />
+        </SQLTask:SqlTaskData>
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Success1]" DTS:DTSID="{FA786BDB-9FFD-52D7-9BF7-A9B04B02A502}" DTS:ObjectName="Success1" DTS:From="Package\Read source counts" DTS:To="Package\Check warehouse quality" DTS:Value="0" DTS:EvalOp="2" DTS:LogicalAnd="True" />
+    <DTS:PrecedenceConstraint DTS:refId="Package.PrecedenceConstraints[Success2]" DTS:DTSID="{8CFEBDDA-7C51-5405-A130-AC657DD65A07}" DTS:ObjectName="Success2" DTS:From="Package\Check warehouse quality" DTS:To="Package\Read latest load audit" DTS:Value="0" DTS:EvalOp="2" DTS:LogicalAnd="True" />
+  </DTS:PrecedenceConstraints>
+</DTS:Executable>

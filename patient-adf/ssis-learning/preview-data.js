@@ -1,0 +1,26 @@
+window.packageSteps = [
+  {
+    "name": "Read source counts",
+    "database": "Diamond02",
+    "variable": "SourceSummary",
+    "description": "Execute SQL Task: count the source rows and store one summary string in a package variable.",
+    "sql": "SELECT CONCAT('Patients: ',(SELECT COUNT(*) FROM dbo.Patient),'; Doctors: ',(SELECT COUNT(*) FROM dbo.Doctor),'; Appointments: ',(SELECT COUNT(*) FROM dbo.Appointment)) AS Summary;",
+    "example": "Patients: 6; Doctors: 3; Appointments: 8"
+  },
+  {
+    "name": "Check warehouse quality",
+    "database": "DiamondWarehouse",
+    "variable": "QualitySummary",
+    "description": "Execute SQL Task: run the existing validation procedure. A SQL error fails the task and stops the success path.",
+    "sql": "SET NOCOUNT ON; DECLARE @results TABLE(QualityStatus varchar(20),AppointmentRows int,AppointmentAmountGBP decimal(18,2)); INSERT @results EXEC etl.CheckWarehouseQuality; SELECT CONCAT(QualityStatus,'; Appointments: ',AppointmentRows,'; Amount GBP: ',AppointmentAmountGBP) AS Summary FROM @results;",
+    "example": "Passed; Appointments: 8; Amount GBP: 585.00"
+  },
+  {
+    "name": "Read latest load audit",
+    "database": "DiamondWarehouse",
+    "variable": "LatestLoadSummary",
+    "description": "Execute SQL Task: read the latest successful load and save its summary. No audit row is reported as No successful load yet.",
+    "sql": "SELECT COALESCE((SELECT TOP (1) CONCAT('Run: ',CONVERT(varchar(36),RunId),'; Loaded UTC: ',CONVERT(varchar(19),LoadedAtUtc,126),'; Appointments: ',AppointmentRows) FROM etl.LoadAudit ORDER BY LoadedAtUtc DESC,RunId DESC),'No successful load yet') AS Summary;",
+    "example": "Latest successful load: 8 appointments (illustrative output)"
+  }
+];

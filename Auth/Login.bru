@@ -1,0 +1,86 @@
+meta {
+  name: Login
+  type: graphql
+  seq: 2
+}
+
+post {
+  url: {{coreGraphqlUrl}}
+  body: graphql
+  auth: none
+}
+
+headers {
+  ~Accept: application/json
+  ~Content-Type: application/json
+}
+
+body:graphql {
+  mutation Login($input: LoginInput!) {
+    login(input: $input) {
+      token
+      refreshToken
+      refreshExpiresIn
+      user {
+        firstName
+        lastName
+        email
+        lastLogin
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "input": {
+      "username": "{{testUserEmail}}",
+      "password": "{{testUserPassword}}"
+    }
+  }
+}
+
+script:pre-request {
+  ["authToken", "ndcAuthorization", "loggedInUserName", "loggedInUserEmail"].forEach(name => {
+    bru.setVar(name, "");
+    bru.deleteEnvVar(name);
+  });
+  const email = bru.getProcessEnv("TEST_USER_EMAIL") || bru.getEnvVar("testUserEmail");
+  const password = bru.getProcessEnv("TEST_USER_PASSWORD") || bru.getEnvVar("testUserPassword");
+  if (!email || !password || String(password).includes("{{")) {
+    throw new Error("Login credentials are missing. Configure TEST_USER_EMAIL and TEST_USER_PASSWORD in .env, or the Staging secret testUserPassword.");
+  }
+  bru.setVar("testUserEmail", email);
+  bru.setVar("testUserPassword", password);
+}
+
+script:post-response {
+  const response = res.body;
+  const login = response && response.data && response.data.login;
+  const token = login && login.token;
+  const user = (login && login.user) || {};
+
+  if (token && user.email === bru.getVar("testUserEmail")) {
+    bru.setVar("authToken", token);
+    bru.setVar("ndcAuthorization", token);
+    bru.setVar("loggedInUserName", [user.firstName, user.lastName].filter(Boolean).join(" "));
+    bru.setVar("loggedInUserEmail", user.email || "");
+    bru.setEnvVar("authToken", token);
+  }
+}
+
+tests {
+  test("Login returned a token", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.errors).to.be.undefined;
+    expect(res.body.data && res.body.data.login && res.body.data.login.token).to.be.a("string").and.not.empty;
+  });
+  
+  test("returns the selected user identity", function () {
+    const user = res.body.data && res.body.data.login && res.body.data.login.user;
+    expect(user, "login response user").to.be.an("object");
+    expect(user && user.firstName, "login response first name").to.be.a("string").and.not.empty;
+    expect(user && user.lastName, "login response last name").to.be.a("string").and.not.empty;
+    expect(user && user.email, "login response email").to.equal(bru.getVar("testUserEmail"));
+  });
+}

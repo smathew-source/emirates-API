@@ -1,0 +1,254 @@
+meta {
+  name: Order Create
+  type: graphql
+  seq: 3
+}
+
+post {
+  url: {{apiBaseUrl}}
+  body: graphql
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Referer: https://workbench.staging.llc.nuflights.com/
+  authorization: {{ndcAuthorization}}
+  x-nf-active-org-short-code: {{activeOrgShortCode}}
+}
+
+body:graphql {
+  mutation ndcOrderCreateMutation($rq: OrderCreateRqInput!) {
+    iataOrderCreate(rq: $rq) {
+      augmentationPoint {
+        common {
+          nfOrderId
+          nfSubscriptionId
+        }
+        provider {
+          nfShoppingResponseId
+        }
+      }
+      payloadAttributes {
+        trxId
+      }
+      response {
+        order {
+          orderId
+          ownerCode
+          totalPrice {
+            totalAmount {
+              cdata
+              curCode
+            }
+          }
+        }
+      }
+      error {
+        code
+        typeCode
+        descText
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "rq": {
+      "distributionChain": {
+        "distributionChainLink": [
+          {
+            "ordinal": 1,
+            "orgRole": "SELLER",
+            "participatingOrg": {
+              "orgId": ""
+            }
+          }
+        ]
+      },
+      "augmentationPoint": {
+        "common": {
+          "nfSubscriptionId": "{{pricedNfSubscriptionId}}"
+        },
+        "provider": {
+          "nfShoppingResponseId": "{{pricedNfShoppingResponseId}}"
+        }
+      },
+      "pos": {
+        "country": {
+          "countryCode": "{{servicingCountryCode}}"
+        }
+      },
+      "payloadAttributes": {
+        "trxId": "{{offerPriceTrxId}}"
+      },
+      "request": {
+        "createOrder": {
+          "acceptSelectedQuotedOfferList": {
+            "selectedPricedOffer": [
+              {
+                "offerRefId": "{{pricedOfferId}}",
+                "ownerCode": "{{pricedOwnerCode}}",
+                "selectedOfferItem": [
+                  {
+                    "offerItemRefId": "{{pricedOfferItemId}}",
+                    "paxRefId": [
+                      "{{requestPassengerId}}"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "dataLists": {
+          "paxList": {
+            "pax": [
+              {
+                "paxId": "{{requestPassengerId}}",
+                "ptc": "{{requestPassengerType}}",
+                "individual": {
+                  "birthdate": "1996-02-13",
+                  "genderCode": "M",
+                  "titleName": "MR",
+                  "givenName": [
+                    "RAVINDRA"
+                  ],
+                  "surname": "BAJAJ",
+                  "individualId": "{{pricedPaxRefId}}"
+                },
+                "identityDoc": [
+                  {
+                    "identityDocTypeCode": "PT",
+                    "identityDocId": "ADT39098822",
+                    "issuingCountryCode": "IN",
+                    "residenceCountryCode": "IN",
+                    "surname": "BAJAJ",
+                    "expiryDate": "2027-04-07"
+                  }
+                ],
+                "langUsage": [
+                  {
+                    "langCode": "EN"
+                  }
+                ],
+                "contactInfoRefId": "ContactInfo-{{pricedPaxRefId}}"
+              }
+            ]
+          },
+          "contactInfoList": {
+            "contactInfo": [
+              {
+                "contactInfoId": "ContactInfo-{{pricedPaxRefId}}",
+                "emailAddress": [
+                  {
+                    "emailAddressText": "RAVINDRA.BAJAJ@YMAIL.COM",
+                    "contactTypeText": "Home"
+                  }
+                ],
+                "individual": {
+                  "givenName": [
+                    "RAVINDRA"
+                  ],
+                  "surname": "BAJAJ"
+                },
+                "individualRefId": "{{pricedPaxRefId}}",
+                "phone": [
+                  {
+                    "contactTypeText": "Home",
+                    "countryDialingCode": "91",
+                    "areaCodeNumber": "983",
+                    "phoneNumber": "2345566",
+                    "extensionNumber": "983"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+
+script:pre-request {
+  // A fresh create must never leave identifiers from a previous booking available
+  // to ticketing or servicing requests if this request fails or times out.
+  [
+    "createdNfOrderId", "createdNfSubscriptionId", "createdOrderId", "createdOwnerCode",
+    "createdOrderTrxId", "retrievedOrderTrxId", "retrievedOrderId", "retrievedOwnerCode",
+    "retrievedOrderItemId", "retrievedServiceId", "retrievedPaxRefId", "retrievedTotalAmount",
+    "retrievedCurrency", "ticketIssueTrxId", "ticketNumber", "ticketedNfOrderId",
+    "ticketedNfSubscriptionId", "ticketedOrderId", "ticketedOwnerCode", "reshopTrxId",
+    "changeOfferId", "changeOfferOwnerCode", "changeOfferAmount", "changeOfferCurrency",
+    "changeOfferItemId", "changeOfferPaxRefId"
+  ].forEach(name => {
+    bru.deleteVar(name);
+    bru.deleteEnvVar(name);
+  });
+  const required = ["ndcAuthorization", "offerPriceTrxId", "pricedNfSubscriptionId", "pricedNfShoppingResponseId", "pricedOfferId", "pricedOwnerCode", "pricedOfferItemId", "pricedPaxRefId"];
+  const missing = required.filter(name => !bru.getVar(name));
+  if (missing.length) throw new Error("Run a successful Offer Price first; missing: " + missing.join(", "));
+}
+
+script:post-response {
+  const orderCreate = res.body.data && res.body.data.iataOrderCreate;
+  
+  if (orderCreate && orderCreate.response) {
+    const order = Array.isArray(orderCreate.response.order)
+      ? orderCreate.response.order[0]
+      : orderCreate.response.order;
+    const common = orderCreate.augmentationPoint.common;
+  
+    if (order) {
+      bru.setVar("createdNfOrderId", common.nfOrderId);
+      bru.setVar("createdNfSubscriptionId", common.nfSubscriptionId);
+      bru.setVar("createdOrderId", order.orderId);
+      bru.setVar("createdOwnerCode", order.ownerCode);
+      bru.setVar("createdOrderTrxId", orderCreate.payloadAttributes.trxId);
+  
+      bru.setEnvVar("createdNfOrderId", common.nfOrderId, { persist: true });
+      bru.setEnvVar("createdNfSubscriptionId", common.nfSubscriptionId, { persist: true });
+      bru.setEnvVar("createdOrderId", order.orderId, { persist: true });
+      bru.setEnvVar("createdOwnerCode", order.ownerCode, { persist: true });
+      bru.setEnvVar("createdOrderTrxId", orderCreate.payloadAttributes.trxId, { persist: true });
+    }
+  }
+}
+
+tests {
+  test("OrderCreate succeeds", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.errors).to.be.undefined;
+  });
+  
+  test("creates an order", function () {
+    // OrderCreate returns one object with either response.order or a business error.
+    const orderCreate = res.body.data.iataOrderCreate;
+  
+    // The provider can return an order together with a retryable TTL warning.
+    const errors = orderCreate.error || [];
+    const blockingErrors = errors.filter(error => error.typeCode !== "Warning");
+    expect(blockingErrors, JSON.stringify(blockingErrors)).to.be.empty;
+  
+    // This is the new order returned by the airline/provider.
+    const order = Array.isArray(orderCreate.response.order)
+      ? orderCreate.response.order[0]
+      : orderCreate.response.order;
+  
+    expect(order.orderId).to.exist;
+  });
+  
+  test("includes ticketable order details", function () {
+    const orderCreate = res.body.data.iataOrderCreate;
+    const order = Array.isArray(orderCreate.response.order)
+      ? orderCreate.response.order[0]
+      : orderCreate.response.order;
+  
+    expect(order.ownerCode).to.be.a("string").and.not.empty;
+    expect(order.totalPrice.totalAmount.cdata).to.be.a("string").and.not.empty;
+    expect(orderCreate.augmentationPoint.common.nfOrderId).to.be.a("string").and.not.empty;
+  });
+}

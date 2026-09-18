@@ -1,0 +1,289 @@
+meta {
+  name: Order Change Confirm
+  type: graphql
+  seq: 9
+}
+
+docs {
+  This confirms the changed itinerary by accepting the first offer returned by Order Reshop Change Search.
+  Run Order Reshop Change Search first so changeOfferId and reshopTrxId are populated.
+}
+
+post {
+  url: {{apiBaseUrl}}
+  body: graphql
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Referer: https://workbench.staging.llc.nuflights.com/
+  authorization: {{ndcAuthorization}}
+  x-nf-active-org-short-code: {{activeOrgShortCode}}
+}
+
+body:graphql {
+  mutation ndcOrderChangeConfirmMutation($rq: OrderChangeRqInput!) {
+    iataOrderChange(rq: $rq) {
+      payloadAttributes {
+        trxId
+      }
+      augmentationPoint {
+        common {
+          nfOrderId
+          nfSubscriptionId
+        }
+      }
+      response {
+        order {
+          orderId
+          ownerCode
+          orderItem {
+            orderItemId
+            service {
+              serviceId
+              paxRefId
+              statusCode
+            }
+          }
+          totalPrice {
+            totalAmount {
+              cdata
+              curCode
+            }
+          }
+        }
+      }
+      error {
+        code
+        descText
+        typeCode
+        statusText
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "rq": {
+      "augmentationPoint": {
+        "common": {
+          "nfSubscriptionId": "{{ticketedNfSubscriptionId}}",
+          "nfOrderId": "{{ticketedNfOrderId}}"
+        },
+        "provider": {
+          "nfShoppingResponseId": "{{reshopNfShoppingResponseId}}"
+        }
+      },
+      "distributionChain": {
+        "distributionChainLink": [
+          {
+            "ordinal": 1,
+            "orgRole": "SELLER",
+            "participatingOrg": {
+              "orgId": "{{servicingOrgId}}"
+            }
+          }
+        ]
+      },
+      "payloadAttributes": {
+        "trxId": "{{reshopTrxId}}"
+      },
+      "pos": {
+        "country": {
+          "countryCode": "{{servicingCountryCode}}"
+        }
+      },
+      "request": {
+        "order": {
+          "orderId": "{{ticketedOrderId}}",
+          "ownerCode": "{{ticketedOwnerCode}}"
+        },
+        "changeOrderChoice": {
+          "acceptSelectedQuotedOfferList": {
+            "selectedPricedOffer": [
+              {
+                "offerRefId": "{{changeOfferId}}",
+                "ownerCode": "{{changeOfferOwnerCode}}",
+                "selectedOfferItem": [
+                  {
+                    "offerItemRefId": "{{changeOfferItemId}}",
+                    "paxRefId": [
+                      "{{changeOfferPaxRefId}}"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "dataLists": {
+          "paxList": {
+            "pax": [
+              {
+                "paxId": "{{changePassengerId}}",
+                "ptc": "{{changePassengerType}}",
+                "contactInfoRefId": "CI1",
+                "birthdate": "1996-02-13",
+                "individual": {
+                  "genderCode": "M",
+                  "birthdate": "1996-02-13",
+                  "titleName": "MR",
+                  "givenName": [
+                    "RAVINDRA"
+                  ],
+                  "surname": "BAJAJ",
+                  "middleName": []
+                },
+                "identityDoc": [
+                  {
+                    "identityDocTypeCode": "PT",
+                    "identityDocId": "ADT39098822",
+                    "issuingCountryCode": "IN",
+                    "citizenshipCountryCode": "IN",
+                    "expiryDate": "2027-04-07",
+                    "givenName": [
+                      "RAVINDRA"
+                    ],
+                    "middleName": [],
+                    "surname": "BAJAJ",
+                    "genderCode": "M",
+                    "birthdate": "1996-02-13"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "orderChangeParameters": {
+          "pricingParameter": {
+            "overrideCurCode": "{{changeOfferCurrency}}"
+          }
+        }
+      }
+    }
+  }
+}
+
+script:pre-request {
+  const requiredOfferVars = [
+    "reshopTrxId",
+    "reshopNfShoppingResponseId",
+    "changeOfferId",
+    "changeOfferOwnerCode",
+    "changeOfferAmount",
+    "changeOfferCurrency",
+    "changeOfferItemId",
+    "changeOfferPaxRefId"
+  ];
+  const missing = requiredOfferVars.filter(name =>
+    !(bru.getVar(name) || bru.getEnvVar(name))
+  );
+
+  if (missing.length) {
+    throw new Error("Run a successful Order Reshop Change Search first; missing: " + missing.join(", "));
+  }
+}
+
+script:post-response {
+  const orderChange = res.body.data && res.body.data.iataOrderChange;
+
+  if (orderChange) {
+    const augmentation = orderChange.augmentationPoint && orderChange.augmentationPoint.common;
+    const rawOrder = orderChange.response && orderChange.response.order;
+    const order = Array.isArray(rawOrder) ? rawOrder[0] : rawOrder;
+    const rawItems = order && order.orderItem;
+    const item = Array.isArray(rawItems) ? rawItems[0] : rawItems;
+    const rawServices = item && item.service;
+    const service = Array.isArray(rawServices) ? rawServices[0] : rawServices;
+    const rawPaxRefIds = service && service.paxRefId;
+    const paxRefIds = Array.isArray(rawPaxRefIds)
+      ? rawPaxRefIds
+      : rawPaxRefIds
+        ? [rawPaxRefIds]
+        : [];
+    const amount = order && order.totalPrice && order.totalPrice.totalAmount;
+    const values = {
+      orderChangeTrxId: orderChange.payloadAttributes && orderChange.payloadAttributes.trxId,
+      changedNfOrderId: augmentation && augmentation.nfOrderId,
+      changedNfSubscriptionId: augmentation && augmentation.nfSubscriptionId,
+      changedOrderId: order && order.orderId,
+      changedOwnerCode: order && order.ownerCode,
+      changedOrderItemId: item && item.orderItemId,
+      changedPaxRefId: paxRefIds[0],
+      changedTotalAmount: amount && amount.cdata,
+      changedCurrency: amount && amount.curCode
+    };
+
+    Object.keys(values).forEach(name => {
+      if (values[name] !== undefined && values[name] !== null && values[name] !== "") {
+        bru.setVar(name, values[name]);
+        bru.setEnvVar(name, values[name], { persist: true });
+      }
+    });
+  }
+}
+
+tests {
+  test("OrderChange confirm returns HTTP success", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.errors).to.be.undefined;
+  });
+
+  test("OrderChange confirm has no business errors", function () {
+    const orderChange = res.body.data.iataOrderChange;
+    const errors = orderChange.error || [];
+
+    // A confirmed order may include ticket time-limit or flight-time warnings.
+    // Booking and service details are validated by the assertions below.
+    const blockingErrors = errors.filter(error =>
+      !(error.typeCode === "Warning" && (
+        error.code === "NFE-NDC-TTL-INCORRECT" ||
+        /^(?:None - )?(?:Departure|Arrival) Time changed for\b/.test(error.descText || "")
+      ))
+    );
+    expect(blockingErrors.length, JSON.stringify(blockingErrors)).to.equal(0);
+  });
+
+  test("OrderChange confirm returns a transaction id", function () {
+    const orderChange = res.body.data.iataOrderChange;
+    const trxId = orderChange.payloadAttributes && orderChange.payloadAttributes.trxId;
+
+    expect(trxId).to.be.a("string").and.not.empty;
+  });
+
+  test("OrderChange confirm returns the confirmed booking", function () {
+    const orderChange = res.body.data.iataOrderChange;
+    const rawOrder = orderChange.response && orderChange.response.order;
+    const order = Array.isArray(rawOrder) ? rawOrder[0] : rawOrder;
+
+    expect(order).to.be.an("object");
+    expect(order.orderId).to.equal(bru.getVar("ticketedOrderId") || bru.getEnvVar("ticketedOrderId"));
+    expect(order.ownerCode).to.be.a("string").and.not.empty;
+    expect(order.orderItem).to.be.an("array").that.is.not.empty;
+  });
+
+  test("confirmed booking contains service and price details", function () {
+    const rawOrder = res.body.data.iataOrderChange.response.order;
+    const order = Array.isArray(rawOrder) ? rawOrder[0] : rawOrder;
+    const rawItems = order.orderItem;
+    const items = Array.isArray(rawItems) ? rawItems : [rawItems];
+    const rawServices = items[0].service;
+    const services = Array.isArray(rawServices) ? rawServices : [rawServices];
+    const service = services[0];
+    const paxRefIds = Array.isArray(service.paxRefId)
+      ? service.paxRefId
+      : service.paxRefId
+        ? [service.paxRefId]
+        : [];
+    const amount = order.totalPrice && order.totalPrice.totalAmount;
+
+    expect(items[0].orderItemId).to.be.a("string").and.not.empty;
+    expect(service.serviceId).to.be.a("string").and.not.empty;
+    expect(paxRefIds).to.be.an("array").that.is.not.empty;
+    expect(amount.cdata).to.exist;
+    expect(amount.curCode).to.be.a("string").and.not.empty;
+  });
+}

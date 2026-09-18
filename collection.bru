@@ -1,0 +1,29 @@
+script:pre-request {
+  function addCalendarDays(date, days) {
+    const result = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate() + days,
+      12
+    );
+    const year = result.getFullYear();
+    const month = String(result.getMonth() + 1).padStart(2, "0");
+    const day = String(result.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  const runDate = new Date();
+  const bookingDate = addCalendarDays(runDate, 14);
+  const reshopDate = addCalendarDays(runDate, 28);
+
+  bru.setVar("requestDepartureDate", bookingDate);
+  bru.setVar("originalDepartureDate", bookingDate);
+  bru.setVar("changeDepartureDate", reshopDate);
+}
+
+docs {
+  Shared date helper for the Emirates workflow.
+  The original booking departs 14 calendar days after the run date.
+  The reshop itinerary departs 28 calendar days after the run date.
+}

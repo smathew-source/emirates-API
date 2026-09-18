@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "Emirates API",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

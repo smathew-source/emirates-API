@@ -1,0 +1,197 @@
+meta {
+  name: Offer Price
+  type: graphql
+  seq: 2
+}
+
+post {
+  url: {{apiBaseUrl}}
+  body: graphql
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Referer: https://workbench.staging.llc.nuflights.com/
+  authorization: {{ndcAuthorization}}
+  x-nf-active-org-short-code: {{activeOrgShortCode}}
+}
+
+body:graphql {
+  query ndcOfferPriceQuery($rq: OfferPriceRqInput!) {
+    iataOfferPrice(rq: $rq) {
+      payloadAttributes {
+        trxId
+      }
+      augmentationPoint {
+        common {
+          nfSubscriptionId
+        }
+        provider {
+          nfShoppingResponseId
+        }
+      }
+      response {
+        pricedOffer {
+          offerId
+          ownerCode
+          offerItem {
+            offerItemId
+            service {
+              paxRefId
+            }
+          }
+          totalPrice {
+            totalAmount {
+              cdata
+              curCode
+            }
+          }
+        }
+      }
+      error {
+        code
+        descText
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "rq": {
+      "augmentationPoint": {
+        "common": {
+          "nfSubscriptionId": "{{selectedNfSubscriptionId}}"
+        },
+        "provider": {
+          "nfShoppingResponseId": "{{selectedNfShoppingResponseId}}"
+        }
+      },
+      "pos": {
+        "country": {
+          "countryCode": "{{servicingCountryCode}}"
+        }
+      },
+      "distributionChain": {
+        "distributionChainLink": [
+          {
+            "ordinal": 1,
+            "orgRole": "SELLER",
+            "participatingOrg": {
+              "orgId": ""
+            }
+          }
+        ]
+      },
+      "request": {
+        "pricedOffer": {
+          "selectedOfferList": {
+            "selectedOffer": [
+              {
+                "offerRefId": "{{selectedOfferId}}",
+                "ownerCode": "{{selectedOwnerCode}}",
+                "selectedOfferItem": [
+                  {
+                    "offerItemRefId": "{{selectedOfferItemId}}",
+                    "paxRefId": [
+                      "{{requestPassengerId}}"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "dataLists": {
+          "paxList": {
+            "pax": [
+              {
+                "paxId": "{{requestPassengerId}}",
+                "ptc": "{{requestPassengerType}}"
+              }
+            ]
+          }
+        },
+        "responseParameters": {
+          "pricingParameter": {
+            "overrideCurCode": "{{requestCurrency}}"
+          }
+        }
+      },
+      "payloadAttributes": {
+        "trxId": "{{airShoppingTrxId}}"
+      }
+    }
+  }
+}
+
+script:pre-request {
+  ["offerPriceTrxId", "pricedNfSubscriptionId", "pricedNfShoppingResponseId", "pricedOfferId", "pricedOwnerCode", "pricedOfferItemId", "pricedPaxRefId"].forEach(name => {
+    bru.setVar(name, "");
+    bru.deleteEnvVar(name);
+  });
+  const required = ["ndcAuthorization", "airShoppingTrxId", "selectedNfSubscriptionId", "selectedNfShoppingResponseId", "selectedOfferId", "selectedOwnerCode", "selectedOfferItemId"];
+  const missing = required.filter(name => !bru.getVar(name));
+  if (missing.length) throw new Error("Run a successful Air Shopping first; missing: " + missing.join(", "));
+}
+
+script:post-response {
+  const offerPrice = res.body.data && res.body.data.iataOfferPrice;
+  
+  // Save OrderCreate values only when OfferPrice returned a priced offer.
+  if (offerPrice && offerPrice.response) {
+    const pricedOffer = offerPrice.response.pricedOffer;
+    const offerItem = pricedOffer.offerItem[0];
+    const service = offerItem.service[0];
+    const provider = offerPrice.augmentationPoint.provider;
+    const nfShoppingResponseId = provider ? provider.nfShoppingResponseId : bru.getVar("selectedNfShoppingResponseId");
+  
+    bru.setVar("offerPriceTrxId", offerPrice.payloadAttributes.trxId);
+    bru.setVar("pricedNfSubscriptionId", offerPrice.augmentationPoint.common.nfSubscriptionId);
+    bru.setVar("pricedNfShoppingResponseId", nfShoppingResponseId);
+    bru.setVar("pricedOfferId", pricedOffer.offerId);
+    bru.setVar("pricedOwnerCode", pricedOffer.ownerCode);
+    bru.setVar("pricedOfferItemId", offerItem.offerItemId);
+    bru.setVar("pricedPaxRefId", service.paxRefId[0]);
+  
+    bru.setEnvVar("offerPriceTrxId", offerPrice.payloadAttributes.trxId);
+    bru.setEnvVar("pricedNfSubscriptionId", offerPrice.augmentationPoint.common.nfSubscriptionId);
+    bru.setEnvVar("pricedNfShoppingResponseId", nfShoppingResponseId);
+    bru.setEnvVar("pricedOfferId", pricedOffer.offerId);
+    bru.setEnvVar("pricedOwnerCode", pricedOffer.ownerCode);
+    bru.setEnvVar("pricedOfferItemId", offerItem.offerItemId);
+    bru.setEnvVar("pricedPaxRefId", service.paxRefId[0]);
+  }
+}
+
+tests {
+  test("OfferPrice succeeds", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.errors).to.be.undefined;
+  });
+  
+  test("returns priced offer", function () {
+    // The API returns iataOfferPrice as one object.
+    const offerPrice = res.body.data.iataOfferPrice;
+  
+    // A successful OfferPrice result should not contain a business error.
+    const errors = offerPrice.error || [];
+    expect(errors.length).to.equal(0);
+  
+    // The priced offer is the confirmed price for the selected AirShopping offer.
+    expect(offerPrice.response.pricedOffer).to.exist;
+  });
+  
+  test("returns a valid priced offer", function () {
+    const offerPrice = res.body.data.iataOfferPrice;
+    const pricedOffer = offerPrice.response.pricedOffer;
+    const offerItem = pricedOffer.offerItem[0];
+    const service = offerItem.service[0];
+  
+    expect(pricedOffer.ownerCode).to.be.a("string").and.not.empty;
+    expect(pricedOffer.totalPrice.totalAmount.cdata).to.be.a("string").and.not.empty;
+    expect(service.paxRefId).to.be.an("array").that.is.not.empty;
+  });
+}

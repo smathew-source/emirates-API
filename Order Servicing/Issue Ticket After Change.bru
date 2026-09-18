@@ -1,0 +1,294 @@
+meta {
+  name: Issue Ticket After Change
+  type: graphql
+  seq: 10
+}
+
+docs {
+  Issues the changed itinerary after Order Change Confirm.
+  Run Order Change Confirm first so the confirmed order and transaction details are populated.
+}
+
+post {
+  url: {{apiBaseUrl}}
+  body: graphql
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Referer: https://workbench.staging.llc.nuflights.com/
+  authorization: {{ndcAuthorization}}
+  x-nf-active-org-short-code: {{activeOrgShortCode}}
+}
+
+body:graphql {
+  mutation ndcOrderChangePaymentAfterChangeMutation($rq: OrderChangeRqInput!) {
+    iataOrderChange(rq: $rq) {
+      error {
+        descText
+        code
+        typeCode
+        statusText
+      }
+      payloadAttributes {
+        trxId
+      }
+      response {
+        order {
+          orderId
+          ownerCode
+          totalPrice {
+            totalAmount {
+              cdata
+              curCode
+            }
+          }
+        }
+        ticketDocInfo {
+          paxRefId
+          referencedOrder {
+            orderId
+            ownerCode
+          }
+          originalIssueInfo {
+            ticketNumber
+          }
+          ticket {
+            ticketDocTypeCode
+            ticketNumber
+            coupon {
+              couponNumber
+              couponStatusCode
+            }
+          }
+        }
+      }
+      paymentFunctions {
+        paymentProcessingSummary {
+          paymentId
+          amount {
+            cdata
+            curCode
+          }
+          paymentStatusCode
+        }
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "rq": {
+      "augmentationPoint": {
+        "agency": {
+          "paymentFunctions": [
+            {
+              "orderAssociation": {
+                "orderItemRefId": [
+                  "{{changedOrderItemId}}"
+                ]
+              },
+              "paymentMethodCriteria": {
+                "paymentTypeCode": "{{ticketingPaymentTypeCode}}",
+                "customerCode": "{{customerPaymentCode}}"
+              }
+            }
+          ]
+        },
+        "common": {
+          "nfSubscriptionId": "{{changedNfSubscriptionId}}",
+          "nfOrderId": "{{changedNfOrderId}}"
+        },
+        "paymentMetaData": {
+          "usageAttributes": [
+            {
+              "attribKey": "trxSellerDiscount1",
+              "attribValue": "0",
+              "paxRefs": ["{{changedPaxRefId}}"],
+              "usages": ["OrderAdjustments"]
+            },
+            {
+              "attribKey": "trxSellerDiscount2",
+              "attribValue": "0",
+              "paxRefs": ["{{changedPaxRefId}}"],
+              "usages": ["OrderAdjustments"]
+            },
+            {
+              "attribKey": "trxSellerDiscount3",
+              "attribValue": "0",
+              "paxRefs": ["{{changedPaxRefId}}"],
+              "usages": ["OrderAdjustments"]
+            },
+            {
+              "attribKey": "trxSellerServiceFee1",
+              "attribValue": "0",
+              "paxRefs": ["{{changedPaxRefId}}"],
+              "usages": ["OrderAdjustments"]
+            },
+            {
+              "attribKey": "trxSellerServiceFee2",
+              "attribValue": "0",
+              "paxRefs": ["{{changedPaxRefId}}"],
+              "usages": ["OrderAdjustments"]
+            },
+            {
+              "attribKey": "trxSellerServiceFee3",
+              "attribValue": "0",
+              "paxRefs": ["{{changedPaxRefId}}"],
+              "usages": ["OrderAdjustments"]
+            }
+          ]
+        }
+      },
+      "distributionChain": {
+        "distributionChainLink": [
+          {
+            "ordinal": 1,
+            "orgRole": "SELLER",
+            "participatingOrg": {
+              "orgId": "{{servicingOrgId}}"
+            }
+          }
+        ]
+      },
+      "payloadAttributes": {
+        "trxId": "{{orderChangeTrxId}}"
+      },
+      "pos": {
+        "country": {
+          "countryCode": "{{servicingCountryCode}}"
+        }
+      },
+      "request": {
+        "order": {
+          "orderId": "{{changedOrderId}}",
+          "ownerCode": "{{changedOwnerCode}}"
+        },
+        "paymentFunctions": [
+          {
+            "paymentMethodCriteria": {
+              "paymentTypeCode": "{{ticketingPaymentTypeCode}}"
+            },
+            "paymentProcessingDetails": {
+              "amount": {
+                "cdata": "{{changedTotalAmount}}",
+                "curCode": "{{changedCurrency}}"
+              },
+              "paymentMethod": {
+                "settlementPlan": {
+                  "paymentTypeCode": "{{ticketingPaymentTypeCode}}"
+                }
+              }
+            },
+            "orderAssociation": {
+              "orderItemRefId": [
+                "{{changedOrderItemId}}"
+              ],
+              "orderRefId": "{{changedOrderId}}"
+            }
+          }
+        ],
+        "orderChangeParameters": {
+          "pricingParameter": {
+            "overrideCurCode": "{{changedCurrency}}"
+          }
+        }
+      }
+    }
+  }
+}
+
+script:pre-request {
+  const required = [
+    "orderChangeTrxId", "changedNfOrderId", "changedNfSubscriptionId",
+    "changedOrderId", "changedOwnerCode", "changedOrderItemId",
+    "changedPaxRefId", "changedTotalAmount", "changedCurrency"
+  ];
+  const missing = required.filter(name => !(bru.getVar(name) || bru.getEnvVar(name)));
+
+  if (missing.length) {
+    throw new Error("Run a successful Order Change Confirm first; missing: " + missing.join(", "));
+  }
+}
+
+script:post-response {
+  const orderChange = res.body.data && res.body.data.iataOrderChange;
+  const rawDocInfo = orderChange && orderChange.response && orderChange.response.ticketDocInfo;
+  const docInfo = Array.isArray(rawDocInfo) ? rawDocInfo[0] : rawDocInfo;
+  const rawTickets = docInfo && docInfo.ticket;
+  const ticket = Array.isArray(rawTickets) ? rawTickets[0] : rawTickets;
+  const ticketNumber = ticket && ticket.ticketNumber ||
+    docInfo && docInfo.originalIssueInfo && docInfo.originalIssueInfo.ticketNumber;
+
+  if (orderChange && orderChange.payloadAttributes && orderChange.payloadAttributes.trxId) {
+    bru.setVar("changedTicketIssueTrxId", orderChange.payloadAttributes.trxId);
+    bru.setEnvVar("changedTicketIssueTrxId", orderChange.payloadAttributes.trxId, { persist: true });
+  }
+  if (ticketNumber) {
+    bru.setVar("changedTicketNumber", ticketNumber);
+    bru.setEnvVar("changedTicketNumber", ticketNumber, { persist: true });
+  }
+}
+
+tests {
+  test("IssueTicket after change returns HTTP success", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.errors).to.be.undefined;
+  });
+
+  test("IssueTicket after change has no business errors", function () {
+    const errors = res.body.data.iataOrderChange.error || [];
+    expect(errors).to.be.an("array").that.is.empty;
+  });
+
+  test("changed Emirates itinerary returns a ticket document", function () {
+    const orderChange = res.body.data.iataOrderChange;
+    const rawDocInfo = orderChange.response.ticketDocInfo;
+    const docInfo = Array.isArray(rawDocInfo) ? rawDocInfo[0] : rawDocInfo;
+    const rawTickets = docInfo.ticket;
+    const ticket = Array.isArray(rawTickets) ? rawTickets[0] : rawTickets;
+    const rawCoupons = ticket.coupon;
+    const coupons = Array.isArray(rawCoupons) ? rawCoupons : [rawCoupons];
+    const ticketNumber = ticket.ticketNumber ||
+      (docInfo.originalIssueInfo && docInfo.originalIssueInfo.ticketNumber);
+
+    expect(ticketNumber).to.be.a("string").and.not.empty;
+    expect(ticket.ticketDocTypeCode).to.be.a("string").and.not.empty;
+    expect(coupons).to.be.an("array").that.is.not.empty;
+    expect(coupons[0].couponNumber).to.exist;
+    expect(coupons[0].couponStatusCode).to.be.a("string").and.not.empty;
+  });
+
+  test("changed itinerary ticket payment is recorded", function () {
+    const rawPayments = res.body.data.iataOrderChange.paymentFunctions;
+    const payments = Array.isArray(rawPayments) ? rawPayments : [rawPayments];
+    const summary = payments[0].paymentProcessingSummary;
+
+    expect(summary.paymentId).to.be.a("string").and.not.empty;
+    expect(summary.paymentStatusCode).to.be.a("string").and.not.empty;
+    expect(summary.amount.cdata).to.exist;
+    expect(summary.amount.curCode).to.equal(bru.getVar("changedCurrency") || bru.getEnvVar("changedCurrency"));
+  });
+
+  test("completes the order reshop change workflow", function () {
+    const orderChange = res.body.data.iataOrderChange;
+    const rawOrder = orderChange.response.order;
+    const order = Array.isArray(rawOrder) ? rawOrder[0] : rawOrder;
+    const rawDocInfo = orderChange.response.ticketDocInfo;
+    const docInfo = Array.isArray(rawDocInfo) ? rawDocInfo[0] : rawDocInfo;
+    const rawTickets = docInfo.ticket;
+    const ticket = Array.isArray(rawTickets) ? rawTickets[0] : rawTickets;
+    const ticketNumber = ticket.ticketNumber ||
+      (docInfo.originalIssueInfo && docInfo.originalIssueInfo.ticketNumber);
+    const expectedOrderId = bru.getVar("changedOrderId") || bru.getEnvVar("changedOrderId");
+
+    expect(orderChange.payloadAttributes.trxId).to.be.a("string").and.not.empty;
+    expect(order.orderId).to.equal(expectedOrderId);
+    expect(docInfo.referencedOrder.orderId).to.equal(expectedOrderId);
+    expect(docInfo.referencedOrder.ownerCode).to.equal(order.ownerCode);
+    expect(ticketNumber).to.be.a("string").and.not.empty;
+  });
+}

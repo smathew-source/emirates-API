@@ -1,0 +1,38 @@
+{
+  "properties": {
+    "description": "Show patient, doctor and appointment row counts in the activity output.",
+    "folder": {
+      "name": "Simple examples"
+    },
+    "concurrency": 1,
+    "annotations": [
+      "Read only",
+      "Manual trigger"
+    ],
+    "activities": [
+      {
+        "name": "CountSourceRows",
+        "type": "Script",
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 0,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_Diamond02"
+        },
+        "typeProperties": {
+          "scripts": [
+            {
+              "type": "Query",
+              "text": "SELECT 'Patient' AS TableName, COUNT(*) AS [RowCount] FROM dbo.Patient UNION ALL SELECT 'Doctor',COUNT(*) FROM dbo.Doctor UNION ALL SELECT 'Appointment',COUNT(*) FROM dbo.Appointment;"
+            }
+          ],
+          "scriptBlockExecutionTimeout": "00:02:00"
+        }
+      }
+    ]
+  }
+}

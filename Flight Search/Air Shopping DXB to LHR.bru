@@ -1,0 +1,325 @@
+meta {
+  name: Air Shopping DXB to LHR
+  type: graphql
+  seq: 1
+}
+
+post {
+  url: {{apiBaseUrl}}
+  body: graphql
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Referer: https://workbench.staging.llc.nuflights.com/
+  authorization: {{ndcAuthorization}}
+  x-nf-active-org-short-code: {{activeOrgShortCode}}
+}
+
+body:graphql {
+  query ndcAirshoppingQuery($rq: AirShoppingRqInput!) {
+    iataAirShopping(rq: $rq) {
+      payloadAttributes {
+        trxId
+      }
+      augmentationPoint {
+        common {
+          nfSubscriptionId
+        }
+        provider {
+          nfShoppingResponseId
+        }
+      }
+      response {
+        offersGroup {
+          carrierOffers {
+            offer {
+              offerId
+              ownerCode
+              journeyOverview {
+                journeyPriceClass {
+                  paxJourneyRefId
+                }
+              }
+              offerItem {
+                offerItemId
+                service {
+                  paxRefId
+                  offerServiceAssociation {
+                    paxJourneyRef {
+                      paxJourneyRefId
+                    }
+                  }
+                }
+              }
+              totalPrice {
+                totalAmount {
+                  cdata
+                  curCode
+                }
+              }
+            }
+          }
+        }
+        dataLists {
+          paxJourneyList {
+            paxJourney {
+              paxJourneyId
+              paxSegmentRefId
+            }
+          }
+          paxSegmentList {
+            paxSegment {
+              paxSegmentId
+              datedMarketingSegmentRefId
+            }
+          }
+          datedMarketingSegmentList {
+            datedMarketingSegment {
+              datedMarketingSegmentId
+              dep {
+                iataLocationCode
+              }
+              arrival {
+                iataLocationCode
+              }
+            }
+          }
+        }
+      }
+      error {
+        code
+        descText
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "rq": {
+      "distributionChain": {
+        "distributionChainLink": [
+          {
+            "ordinal": 1,
+            "orgRole": "SELLER",
+            "participatingOrg": {
+              "orgId": "{{servicingOrgId}}"
+            }
+          }
+        ]
+      },
+      "payloadAttributes": {},
+      "request": {
+        "flightRequest": {
+          "flightRequestOriginDestinationsCriteria": {
+            "originDestCriteria": [
+              {
+                "originDestId": "OD1",
+                "originDepCriteria": {
+                  "date": "{{requestDepartureDate}}",
+                  "iataLocationCode": "{{requestOrigin}}"
+                },
+                "destArrivalCriteria": {
+                  "iataLocationCode": "{{requestDestination}}"
+                },
+                "cabinType": [
+                  {
+                    "cabinTypeCode": "{{requestCabinTypeCode}}",
+                    "prefLevel": {
+                      "prefLevelCode": "PREFERRED"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "paxList": {
+          "pax": [
+            {
+              "ptc": "{{requestPassengerType}}",
+              "paxId": "{{requestPassengerId}}"
+            }
+          ]
+        },
+        "responseParameters": {
+          "curParameter": {
+            "curCode": "{{requestCurrency}}"
+          }
+        },
+        "flightRelatedCriteria": {
+          "carrierCriteria": [
+            {
+              "carrier": {
+                "airlineDesigCode": "{{requestAirlineCode}}"
+              }
+            }
+          ]
+        },
+        "offerCriteria": {
+          "fareCriteria": [
+            {
+              "prefLevel": {
+                "prefLevelCode": "PREFERRED"
+              },
+              "fareTypeCode": [
+                "70J"
+              ],
+              "fareSubTypeCode": [
+                ""
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+
+script:pre-request {
+  [
+    "airShoppingTrxId", "selectedNfSubscriptionId", "selectedNfShoppingResponseId",
+    "selectedOfferId", "selectedOwnerCode", "selectedOfferItemId", "selectedPaxRefId",
+    "offerPriceTrxId", "pricedNfSubscriptionId", "pricedNfShoppingResponseId",
+    "pricedOfferId", "pricedOwnerCode", "pricedOfferItemId", "pricedPaxRefId"
+  ].forEach(name => {
+    bru.setVar(name, "");
+    bru.deleteEnvVar(name);
+  });
+  if (!bru.getVar("ndcAuthorization")) {
+    throw new Error("Run a successful Login with the intended account before Air Shopping.");
+  }
+}
+
+script:post-response {
+  function first(value) {
+    if (!value) return undefined;
+    return Array.isArray(value) ? value[0] : value;
+  }
+
+  function saveVar(bru, name, value) {
+    bru.setVar(name, value || "");
+    bru.setEnvVar(name, value || "", { persist: true });
+  }
+
+  const airShopping = first(res.body.data && res.body.data.iataAirShopping);
+  
+  // Save OfferPrice values only when AirShopping returned real offers.
+  if (airShopping && airShopping.response && !(res.body.errors || []).length && !(airShopping.error || []).length) {
+    const carrierOffer = first((airShopping.response.offersGroup || {}).carrierOffers) || {};
+    const offers = carrierOffer.offer || [];
+    const lists = airShopping.response.dataLists || {};
+    const journeys = (lists.paxJourneyList || {}).paxJourney || [];
+    const paxSegments = (lists.paxSegmentList || {}).paxSegment || [];
+    const datedSegments = (lists.datedMarketingSegmentList || {}).datedMarketingSegment || [];
+  
+    function findById(items, idName, id) {
+      return items.find(item => item[idName] === id);
+    }
+  
+    function getJourneyRef(offer) {
+      const journeyPriceClass = offer.journeyOverview &&
+        offer.journeyOverview.journeyPriceClass &&
+        offer.journeyOverview.journeyPriceClass[0];
+      const service = offer.offerItem &&
+        offer.offerItem[0] &&
+        offer.offerItem[0].service &&
+        offer.offerItem[0].service[0];
+      const paxJourneyRef = service &&
+        service.offerServiceAssociation &&
+        service.offerServiceAssociation.paxJourneyRef;
+  
+      return journeyPriceClass && journeyPriceClass.paxJourneyRefId
+        ? journeyPriceClass.paxJourneyRefId
+        : paxJourneyRef && paxJourneyRef.paxJourneyRefId && paxJourneyRef.paxJourneyRefId[0];
+    }
+  
+    function isDirectOffer(offer) {
+      const journey = findById(journeys, "paxJourneyId", getJourneyRef(offer));
+      const segmentRefIds = journey && journey.paxSegmentRefId ? journey.paxSegmentRefId : [];
+  
+      if (segmentRefIds.length !== 1) {
+        return false;
+      }
+  
+      const paxSegment = findById(paxSegments, "paxSegmentId", segmentRefIds[0]);
+      const datedSegment = paxSegment &&
+        findById(datedSegments, "datedMarketingSegmentId", paxSegment.datedMarketingSegmentRefId);
+  
+      return datedSegment &&
+        datedSegment.dep.iataLocationCode === "DXB" &&
+        datedSegment.arrival.iataLocationCode === "LHR";
+    }
+  
+    const directOffers = Array.isArray(offers) ? offers.filter(isDirectOffer) : [];
+    const offer = first(directOffers) || first(offers);
+    const offerItem = offer && first(offer.offerItem);
+    const service = offerItem && first(offerItem.service);
+    const common = (airShopping.augmentationPoint || {}).common || {};
+    const provider = (airShopping.augmentationPoint || {}).provider || {};
+    if (offer && offerItem && service && (service.paxRefId || []).length && common.nfSubscriptionId && provider.nfShoppingResponseId) {
+  
+    saveVar(bru, "requestOrigin", req.body.variables.rq.request.flightRequest.flightRequestOriginDestinationsCriteria.originDestCriteria[0].originDepCriteria.iataLocationCode);
+    saveVar(bru, "requestDestination", req.body.variables.rq.request.flightRequest.flightRequestOriginDestinationsCriteria.originDestCriteria[0].destArrivalCriteria.iataLocationCode);
+    saveVar(bru, "requestDepartureDate", req.body.variables.rq.request.flightRequest.flightRequestOriginDestinationsCriteria.originDestCriteria[0].originDepCriteria.date);
+    saveVar(bru, "requestCabinTypeCode", req.body.variables.rq.request.flightRequest.flightRequestOriginDestinationsCriteria.originDestCriteria[0].cabinType[0].cabinTypeCode);
+    saveVar(bru, "airShoppingTrxId", airShopping.payloadAttributes.trxId);
+    saveVar(bru, "selectedNfSubscriptionId", airShopping.augmentationPoint.common.nfSubscriptionId);
+    saveVar(bru, "selectedNfShoppingResponseId", airShopping.augmentationPoint.provider.nfShoppingResponseId);
+    saveVar(bru, "selectedOfferId", offer.offerId);
+    saveVar(bru, "selectedOwnerCode", offer.ownerCode);
+    saveVar(bru, "selectedOfferItemId", offerItem.offerItemId);
+    saveVar(bru, "selectedPaxRefId", service.paxRefId[0]);
+    }
+  }
+}
+
+tests {
+  function shoppingResult() {
+    const errors = res.body.errors || [];
+    const detail = errors.map(error => error.message).join("; ");
+    expect(errors, "Air Shopping API error [org=" + bru.getEnvVar("activeOrgShortCode") + ", airline=" + bru.getEnvVar("requestAirlineCode") + "]: " + detail).to.be.empty;
+    const data = res.body.data;
+    expect(data, "Air Shopping returned no data").to.be.an("object");
+    const result = Array.isArray(data.iataAirShopping) ? data.iataAirShopping[0] : data.iataAirShopping;
+    expect(result, "Missing iataAirShopping result").to.be.an("object");
+    expect(result.error || [], "Air Shopping business errors: " + JSON.stringify(result.error)).to.be.empty;
+    expect(result.response, "Missing shopping response").to.be.an("object");
+    return result;
+  }
+
+  test("AirShopping succeeds", function () {
+    expect(res.status).to.equal(200);
+    shoppingResult();
+  });
+  
+  test("returns offers", function () {
+    // The API returns iataAirShopping as an array, so pick the first result.
+    const airShopping = shoppingResult();
+  
+    // A successful AirShopping result should not contain a business error.
+    expect(airShopping.error || []).to.be.empty;
+  
+    // Offers live under response.offersGroup.carrierOffers.
+    const carrierOffers = airShopping.response.offersGroup.carrierOffers;
+  
+    // Check that at least one carrier returned offers.
+    expect(carrierOffers.length).to.be.greaterThan(0);
+  });
+  
+  test("returns a valid first offer", function () {
+    const airShopping = shoppingResult();
+    const carrierOffer = airShopping.response.offersGroup.carrierOffers[0];
+    const offer = carrierOffer.offer[0];
+    const offerItem = offer.offerItem[0];
+    const service = offerItem.service[0];
+  
+    expect(offer.ownerCode).to.be.a("string").and.not.empty;
+    expect(offer.totalPrice.totalAmount.cdata).to.be.a("string").and.not.empty;
+    expect(service.paxRefId).to.be.an("array").that.is.not.empty;
+    expect(bru.getVar("selectedNfSubscriptionId"), "Subscription ID required for Offer Price").to.be.a("string").and.not.empty;
+  });
+}

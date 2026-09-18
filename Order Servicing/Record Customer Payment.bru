@@ -1,0 +1,59 @@
+meta {
+  name: Record Customer Payment
+  type: graphql
+  seq: 6
+}
+
+post {
+  url: {{customerPaymentGraphqlUrl}}
+  body: graphql
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  authorization: {{ndcAuthorization}}
+}
+
+body:graphql {
+  mutation ndcOrderChangePayment1Mutation($input: CustomerPaymentInput!) {
+    customerPayment(input: $input) {
+      success
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "input": {
+      "customerPayments": [
+        {
+          "nuflightsId": "{{createdNfOrderId}}",
+          "bookingReference": "{{retrievedOrderId}}",
+          "FOP": {{customerPaymentFop}},
+          "amount": "{{retrievedTotalAmount}}",
+          "currency": "{{retrievedCurrency}}",
+          "FOPDetail": "{{customerPaymentCode}}",
+          "orderItemId": " {{retrievedOrderItemId}}"
+        }
+      ]
+    }
+  }
+}
+
+script:pre-request {
+  const required = ["ticketNumber", "createdNfOrderId", "retrievedOrderId", "retrievedOrderItemId"];
+  const missing = required.filter(name => !(bru.getVar(name) || bru.getEnvVar(name)));
+  if (missing.length) {
+    throw new Error("Run a successful Issue Ticket first; missing: " + missing.join(", "));
+  }
+}
+
+tests {
+  test("records customer payment", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.errors).to.be.undefined;
+    expect(res.body.data.customerPayment.success).to.equal(true);
+  });
+}

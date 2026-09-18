@@ -1,0 +1,420 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]"
+    },
+    "factoryName": {
+      "type": "string"
+    },
+    "sqlServerName": {
+      "type": "string"
+    },
+    "sourceDatabase": {
+      "type": "string",
+      "defaultValue": "PatientSource"
+    },
+    "warehouseDatabase": {
+      "type": "string",
+      "defaultValue": "PatientWarehouse"
+    },
+    "entraAdminName": {
+      "type": "string"
+    },
+    "entraAdminObjectId": {
+      "type": "string"
+    },
+    "entraAdminPrincipalType": {
+      "type": "string",
+      "defaultValue": "User",
+      "allowedValues": [
+        "User",
+        "Group"
+      ]
+    },
+    "operatorIPv4": {
+      "type": "string",
+      "metadata": {
+        "description": "Your public IPv4 for SQL setup. No broad client firewall range."
+      }
+    },
+    "allowAzureServices": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Demo only: permits public Azure-origin connections, still requiring SQL authentication. Set true for the default Azure IR or configure private networking before running."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Sql/servers",
+      "apiVersion": "2023-08-01",
+      "name": "[parameters('sqlServerName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "version": "12.0",
+        "minimalTlsVersion": "1.2",
+        "publicNetworkAccess": "Enabled",
+        "administrators": {
+          "administratorType": "ActiveDirectory",
+          "azureADOnlyAuthentication": true,
+          "login": "[parameters('entraAdminName')]",
+          "sid": "[parameters('entraAdminObjectId')]",
+          "tenantId": "[subscription().tenantId]",
+          "principalType": "[parameters('entraAdminPrincipalType')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/databases",
+      "apiVersion": "2023-08-01",
+      "name": "[concat(parameters('sqlServerName'), '/', parameters('sourceDatabase'))]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+      ],
+      "sku": {
+        "name": "Basic",
+        "tier": "Basic",
+        "capacity": 5
+      },
+      "properties": {
+        "collation": "SQL_Latin1_General_CP1_CI_AS",
+        "maxSizeBytes": 2147483648
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/databases",
+      "apiVersion": "2023-08-01",
+      "name": "[concat(parameters('sqlServerName'), '/', parameters('warehouseDatabase'))]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+      ],
+      "sku": {
+        "name": "Basic",
+        "tier": "Basic",
+        "capacity": 5
+      },
+      "properties": {
+        "collation": "SQL_Latin1_General_CP1_CI_AS",
+        "maxSizeBytes": 2147483648
+      }
+    },
+    {
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "apiVersion": "2023-08-01",
+      "name": "[concat(parameters('sqlServerName'), '/OperatorSetup')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+      ],
+      "properties": {
+        "startIpAddress": "[parameters('operatorIPv4')]",
+        "endIpAddress": "[parameters('operatorIPv4')]"
+      }
+    },
+    {
+      "condition": "[parameters('allowAzureServices')]",
+      "type": "Microsoft.Sql/servers/firewallRules",
+      "apiVersion": "2023-08-01",
+      "name": "[concat(parameters('sqlServerName'), '/AllowAzureServicesDemo')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+      ],
+      "properties": {
+        "startIpAddress": "0.0.0.0",
+        "endIpAddress": "0.0.0.0"
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories",
+      "apiVersion": "2018-06-01",
+      "name": "[parameters('factoryName')]",
+      "location": "[parameters('location')]",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {}
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "apiVersion": "2018-06-01",
+      "name": "[concat(parameters('factoryName'), '/LS_PatientSource')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories', parameters('factoryName'))]",
+        "[resourceId('Microsoft.Sql/servers/databases', parameters('sqlServerName'), parameters('sourceDatabase'))]"
+      ],
+      "properties": {
+        "type": "AzureSqlDatabase",
+        "typeProperties": {
+          "server": "[concat(parameters('sqlServerName'), '.database.windows.net')]",
+          "database": "[parameters('sourceDatabase')]",
+          "authenticationType": "SystemAssignedManagedIdentity",
+          "encrypt": "mandatory",
+          "trustServerCertificate": false
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/linkedservices",
+      "apiVersion": "2018-06-01",
+      "name": "[concat(parameters('factoryName'), '/LS_PatientWarehouse')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories', parameters('factoryName'))]",
+        "[resourceId('Microsoft.Sql/servers/databases', parameters('sqlServerName'), parameters('warehouseDatabase'))]"
+      ],
+      "properties": {
+        "type": "AzureSqlDatabase",
+        "typeProperties": {
+          "server": "[concat(parameters('sqlServerName'), '.database.windows.net')]",
+          "database": "[parameters('warehouseDatabase')]",
+          "authenticationType": "SystemAssignedManagedIdentity",
+          "encrypt": "mandatory",
+          "trustServerCertificate": false
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "[concat(parameters('factoryName'), '/DS_PatientExtract')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', parameters('factoryName'), 'LS_PatientSource')]"
+      ],
+      "properties": {
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_PatientSource"
+        },
+        "type": "AzureSqlTable",
+        "schema": [],
+        "typeProperties": {
+          "schema": "dbo",
+          "table": "vPatientExtract"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/datasets",
+      "apiVersion": "2018-06-01",
+      "name": "[concat(parameters('factoryName'), '/DS_PatientStage')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/linkedservices', parameters('factoryName'), 'LS_PatientWarehouse')]"
+      ],
+      "properties": {
+        "linkedServiceName": {
+          "type": "LinkedServiceReference",
+          "referenceName": "LS_PatientWarehouse"
+        },
+        "type": "AzureSqlTable",
+        "schema": [],
+        "typeProperties": {
+          "schema": "stg",
+          "table": "PatientExtract"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DataFactory/factories/pipelines",
+      "apiVersion": "2018-06-01",
+      "name": "[concat(parameters('factoryName'), '/PL_PatientWarehouse')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.DataFactory/factories/datasets', parameters('factoryName'), 'DS_PatientExtract')]",
+        "[resourceId('Microsoft.DataFactory/factories/datasets', parameters('factoryName'), 'DS_PatientStage')]"
+      ],
+      "properties": {
+        "concurrency": 1,
+        "annotations": [
+          "Synthetic patient demo",
+          "Manual trigger",
+          "Full extract; Type 1 dimensions"
+        ],
+        "activities": [
+          {
+            "name": "CopyPatientSnapshot",
+            "type": "Copy",
+            "policy": {
+              "timeout": "0.00:30:00",
+              "retry": 2,
+              "retryIntervalInSeconds": 30,
+              "secureInput": true,
+              "secureOutput": true
+            },
+            "inputs": [
+              {
+                "type": "DatasetReference",
+                "referenceName": "DS_PatientExtract"
+              }
+            ],
+            "outputs": [
+              {
+                "type": "DatasetReference",
+                "referenceName": "DS_PatientStage"
+              }
+            ],
+            "typeProperties": {
+              "source": {
+                "type": "AzureSqlSource",
+                "sqlReaderQuery": "SELECT PatientId,GivenName,FamilyName,DateOfBirth,City,EncounterId,EncounterDate,DepartmentId,DepartmentName,CostGBP FROM dbo.vPatientExtract",
+                "queryTimeout": "00:10:00",
+                "partitionOption": "None"
+              },
+              "sink": {
+                "type": "AzureSqlSink",
+                "preCopyScript": "EXEC etl.ResetStage;",
+                "writeBehavior": "insert",
+                "sqlWriterUseTableLock": false
+              },
+              "enableStaging": false,
+              "translator": {
+                "type": "TabularTranslator",
+                "typeConversion": true,
+                "mappings": [
+                  {
+                    "source": {
+                      "name": "PatientId"
+                    },
+                    "sink": {
+                      "name": "PatientId"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "GivenName"
+                    },
+                    "sink": {
+                      "name": "GivenName"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "FamilyName"
+                    },
+                    "sink": {
+                      "name": "FamilyName"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "DateOfBirth"
+                    },
+                    "sink": {
+                      "name": "DateOfBirth"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "City"
+                    },
+                    "sink": {
+                      "name": "City"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "EncounterId"
+                    },
+                    "sink": {
+                      "name": "EncounterId"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "EncounterDate"
+                    },
+                    "sink": {
+                      "name": "EncounterDate"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "DepartmentId"
+                    },
+                    "sink": {
+                      "name": "DepartmentId"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "DepartmentName"
+                    },
+                    "sink": {
+                      "name": "DepartmentName"
+                    }
+                  },
+                  {
+                    "source": {
+                      "name": "CostGBP"
+                    },
+                    "sink": {
+                      "name": "CostGBP"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "LoadDimensionsAndFacts",
+            "type": "SqlServerStoredProcedure",
+            "policy": {
+              "timeout": "0.00:30:00",
+              "retry": 2,
+              "retryIntervalInSeconds": 30,
+              "secureInput": true,
+              "secureOutput": true
+            },
+            "dependsOn": [
+              {
+                "activity": "CopyPatientSnapshot",
+                "dependencyConditions": [
+                  "Succeeded"
+                ]
+              }
+            ],
+            "linkedServiceName": {
+              "type": "LinkedServiceReference",
+              "referenceName": "LS_PatientWarehouse"
+            },
+            "typeProperties": {
+              "storedProcedureName": "etl.LoadPatientWarehouse",
+              "storedProcedureParameters": {
+                "RunId": {
+                  "value": {
+                    "value": "@pipeline().RunId",
+                    "type": "Expression"
+                  },
+                  "type": "Guid"
+                },
+                "ExpectedRows": {
+                  "value": {
+                    "value": "@activity('CopyPatientSnapshot').output.rowsCopied",
+                    "type": "Expression"
+                  },
+                  "type": "Int32"
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "outputs": {
+    "sqlHost": {
+      "type": "string",
+      "value": "[concat(parameters('sqlServerName'), '.database.windows.net')]"
+    },
+    "factoryPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.DataFactory/factories', parameters('factoryName')), '2018-06-01', 'Full').identity.principalId]"
+    },
+    "pipelineName": {
+      "type": "string",
+      "value": "PL_PatientWarehouse"
+    }
+  }
+}

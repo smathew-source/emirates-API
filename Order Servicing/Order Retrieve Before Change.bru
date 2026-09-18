@@ -1,0 +1,166 @@
+meta {
+  name: Order Retrieve Before Change
+  type: graphql
+  seq: 7
+}
+
+post {
+  url: {{apiBaseUrl}}
+  body: graphql
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+  Referer: https://workbench.staging.llc.nuflights.com/
+  authorization: {{ndcAuthorization}}
+  x-nf-active-org-short-code: {{activeOrgShortCode}}
+}
+
+body:graphql {
+  query ndcOrderRetrieve1Query($rq: OrderRetrieveRqInput!) {
+    iataOrderRetrieve(rq: $rq) {
+      error {
+        code
+        descText
+      }
+      payloadAttributes {
+        trxId
+      }
+      augmentationPoint {
+        agency {
+          addServiceFeeToBaseFare
+        }
+      }
+      response {
+        order {
+          orderId
+          ownerCode
+          orderItem {
+            orderItemId
+            service {
+              serviceId
+              paxRefId
+            }
+          }
+          totalPrice {
+            totalAmount {
+              cdata
+              curCode
+            }
+          }
+        }
+        dataLists {
+          paxSegmentList {
+            paxSegment {
+              paxSegmentId
+              datedMarketingSegmentRefId
+            }
+          }
+          datedMarketingSegmentList {
+            datedMarketingSegment {
+              datedMarketingSegmentId
+              carrierDesigCode
+              marketingCarrierFlightNumberText
+              dep {
+                aircraftScheduledDateTime
+                iataLocationCode
+                stationName
+                terminalName
+              }
+              arrival {
+                aircraftScheduledDateTime
+                iataLocationCode
+                stationName
+                terminalName
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+body:graphql:vars {
+  {
+    "rq": {
+      "pos": {
+        "country": {
+          "countryCode": "{{servicingCountryCode}}"
+        }
+      },
+      "augmentationPoint": {
+        "common": {
+          "nfSubscriptionId": "{{ticketedNfSubscriptionId}}",
+          "nfOrderId": "{{ticketedNfOrderId}}"
+        }
+      },
+      "distributionChain": {
+        "distributionChainLink": [
+          {
+            "ordinal": 1,
+            "orgRole": "SELLER",
+            "participatingOrg": {
+              "orgId": "{{servicingOrgId}}"
+            }
+          }
+        ]
+      },
+      "payloadAttributes": {
+        "trxId": null
+      },
+      "request": {
+        "orderValidationFilterCriteria": {
+          "orderFilterCriteria": {
+            "orderId": "{{ticketedOrderId}}",
+            "ownerCode": "{{ticketedOwnerCode}}"
+          }
+        }
+      }
+    }
+  }
+}
+
+script:pre-request {
+  const required = ["ticketedNfOrderId", "ticketedNfSubscriptionId", "ticketedOrderId", "ticketedOwnerCode"];
+  const missing = required.filter(name => !(bru.getVar(name) || bru.getEnvVar(name)));
+  if (missing.length) {
+    throw new Error("Run a successful Issue Ticket first; missing: " + missing.join(", "));
+  }
+}
+
+script:post-response {
+  const retrieve = res.body.data && res.body.data.iataOrderRetrieve;
+
+  if (retrieve && retrieve.response) {
+    const order = Array.isArray(retrieve.response.order)
+      ? retrieve.response.order[0]
+      : retrieve.response.order;
+    const orderItem = order.orderItem && order.orderItem[0];
+    const service = orderItem && orderItem.service && orderItem.service[0];
+
+    bru.setVar("changeOrderTrxId", retrieve.payloadAttributes.trxId);
+    bru.setVar("changeOrderItemId", orderItem && orderItem.orderItemId);
+    bru.setVar("changeServiceId", service && service.serviceId);
+
+    bru.setEnvVar("changeOrderTrxId", retrieve.payloadAttributes.trxId);
+    bru.setEnvVar("changeOrderItemId", orderItem && orderItem.orderItemId);
+    bru.setEnvVar("changeServiceId", service && service.serviceId);
+  }
+}
+
+tests {
+  test("OrderRetrieve before change succeeds", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.errors).to.be.undefined;
+  });
+
+  test("retrieves ticketed order", function () {
+    const retrieve = res.body.data.iataOrderRetrieve;
+    const errors = retrieve.error || [];
+    expect(errors.length).to.equal(0);
+    expect(retrieve.response.order).to.exist;
+  });
+}

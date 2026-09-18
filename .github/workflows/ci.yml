@@ -33,6 +33,7 @@ jobs:
 
   staging:
     name: Emirates staging collection
+    environment: Staging
     runs-on: ubuntu-latest
     needs: validate
 

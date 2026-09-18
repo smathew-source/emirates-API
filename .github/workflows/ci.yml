@@ -59,3 +59,11 @@ jobs:
           New-Item -ItemType Directory -Force -Path reports | Out-Null
           bru run --env Staging --bail --reporter-json reports/github-actions.json --reporter-skip-all-headers --reporter-skip-body
         shell: pwsh
+
+      - name: Upload Bruno report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emirates-api-report-${{ github.run_number }}
+          path: reports/github-actions.json
+          if-no-files-found: warn
